@@ -1,0 +1,111 @@
+using krill;
+using krill.stream;
+using krill.handler;
+
+def map_db;
+def ts_db;
+
+def init_db()
+{
+	stream.map_db.init_db();
+	stream.ts_db.init_db();
+
+	..map_db = stream.map_db;
+	..ts_db = stream.ts_db;
+}
+
+def dump()
+{
+	..map_db.dump();
+	..ts_db.dump();
+}
+
+def xadd(key, id, row, maxlen, about)
+{
+	if key.starts_with('ts:') {
+		ret = ..ts_db.xadd(key, id, row, maxlen, about);
+
+	}
+
+	ret = ..map_db.xadd(key, id, row, maxlen, about);
+
+	krill.signal_block(key);
+	return ret;
+}
+
+
+def xlen(key)
+{
+	if key.starts_with('ts:') {
+		return ..ts_db.xlen(key);
+	}
+
+	return ..map_db.xlen(key);
+}
+
+def xrange(key, start, end, count, fields)
+{
+	if key.starts_with('ts:') {
+		return ..ts_db.xrange(key, start, end, count, fields);
+	}
+
+	return ..map_db.xrange(key, start, end, count, fields);
+}
+
+def xrevrange(key, end, start, count, fields)
+{
+	if key.starts_with('ts:') {
+		return ..ts_db.xrevrange(key, end, start, count, fields);
+	}
+
+	return ..map_db.xrevrange(key, end, start, count, fields);
+}
+
+def xdel(key, ...id_list)
+{
+	if key.starts_with('ts:') {
+		return ..ts_db.xdel(key, id_list...);
+	}
+
+	return ..map_db.xdel(key, id_list...);
+}
+
+def xread(key_id_map, count, block)
+{
+	flag_ts_db = nil;
+	for key, id in key_id_map {
+		if key.starts_with('ts:') {
+			if flag_ts_db == false {
+				return handler.error('ts and stream are mixed');
+			}
+
+			flag_ts_db = true;
+		}
+		else {
+			if flag_ts_db == true {
+				return handler.error('ts and stream are mixed');
+			}
+
+			flag_ts_db = false;
+		}
+	}
+
+	if flag_ts_db == true {
+		return ..ts_db.xread(key_id_map, count, block);
+	}
+
+	return ..map_db.xread(key_id_map, count, block);
+}
+
+# composite db ignore maxlen (handle it by first_limit, second_limit)
+def xtrim(key, count, about)
+{
+	if key.starts_with('ts:') {
+		return ..ts_db.xtrim(key, count, about);
+	}
+
+	return ..map_db.xtrim(key, count, about);
+}
+
+
+

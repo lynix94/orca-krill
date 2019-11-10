@@ -1,0 +1,592 @@
+using datetime;
+
+using krill;
+using krill.stream;
+using krill.handler;
+
+
+def db_handle;
+
+
+def init_stream()
+{
+	stream.stream_db.init_db();
+	stream.db_handle = stream.stream_db;
+}
+
+
+def _stream_type_check(data)
+{
+	if data == nil {
+		return handler.error('stream not exists');
+	}
+	elif data.TYPE != {,}.TYPE {
+		return handler.error('type error');
+	}
+	elif data.KRILL_TYPE != 'stream' {
+		return handler.error('type error');
+	}
+
+	return true;
+}
+
+
+def _get_new_ts(data)
+{
+    ts = (datetime.now().timestamp()*1000).integer().float()/1000;
+    org_id = .._ts_to_id(ts);
+	toks = org_id.split('-');
+	org_msec = toks[0];
+	org_ser = toks[1].integer();
+	ts = .._id_to_ts(org_id); # to remove precision garbage
+
+	ser = org_ser;
+    while data.has_key(ts) {
+		ser += 1;
+        if ser >= 512 {
+            return 'id serial number overflow (more than 512)';
+        }
+
+		new_id = '%s-%d' % (org_msec, ser);
+		ts = .._id_to_ts(new_id);
+    }
+
+	return ts;
+}
+
+
+def _entry_to_list(entry, fields)
+{
+	ts = entry[0];
+	row = entry[1];
+	kv_list = [];
+
+	if fields == nil {
+		for k, v in row {
+			kv_list.push_back(k);
+			kv_list.push_back(v);
+		}
+	}
+	else {
+		for k in fields {
+			kv_list.push_back(k);
+			kv_list.push_back(row[k]);
+		}
+	}
+
+	return [stream._ts_to_id(ts), kv_list];
+}
+
+
+def _ts_to_id(ts)
+{
+	prefix = (ts*1000).integer();
+	suffix = ('%.6f' % ts).split('.')[1].integer()%1000; # xxx.xxx123 -> get 123 as suffix
+	return '%d-%d' % (prefix, suffix);
+}
+
+def _id_to_ts(id)
+{
+	if id.TYPE == type.float {
+		return id;
+	}
+
+	if id == '-' {
+		return 0.float();
+	}
+	if id == '+' {
+		return type.limits.int64_max.float();
+	}
+
+	toks = id.split('-');
+	prefix = toks[0].float()/1000;
+	suffix = 0;
+	if toks.size() == 2 {
+		suffix = toks[1].integer();
+	}
+
+	return ('%.3f%03d' % (prefix, suffix)).float();
+}
+
+def dump()
+{
+	stream.db_handle.dump();
+	return 1;
+}
+
+def __xadd(key, ...param)
+{
+	maxlen = -1;
+	about = false;
+	if param.size() > 3 && param[0].lower() == 'maxlen' {
+		if param[1] == '~' {
+			if param.size() < 6 {
+				return handler.error('insufficient param');
+			}
+
+			about = true;
+			maxlen = param[2].integer();
+			id = param[3];
+			kv_list = param[4:];
+		}
+		else {
+			if param.size() < 5 {
+				return handler.error('insufficient param');
+			}
+
+			maxlen = param[1].integer();
+			id = param[2];
+			kv_list = param[3:];
+		}
+	}
+	else {
+		id = param[0];
+		kv_list = param[1:];
+	}
+
+	idx = 0;
+	size = kv_list.size();
+	row = {,};
+	while idx + 1 < size {
+		k = kv_list[idx];
+		v = kv_list[idx+1].float();
+		row[k] = v;
+		idx += 2;
+	}
+
+	return ..xadd(key, id, row, maxlen, about);
+}
+
+def xadd(key, id, row, maxlen, about)
+{
+	return stream.db_handle.xadd(key, id, row, maxlen, about);
+}
+
+def xlen(key)
+{
+	return stream.db_handle.xlen(key);
+}
+
+def __xrange(key, start, end, ...param)
+{
+	count = 0;
+	fields = nil;
+
+	if param != nil {
+		if param[0].lower() == 'count' {
+			count = param[1].integer();
+			if count <= 0 {
+				return handler.error('invalid count');
+			}
+		}
+		elif param[0].lower() == 'fields' {
+			fields = param[1:];
+		}
+		else {
+			return handler.error('command format error');
+		}
+	}
+
+	return ..xrange(key, start, end, count, fields);
+}
+
+def xrange(key, start, end, count, fields)
+{
+	return stream.db_handle.xrange(key, start, end, count, fields);
+}
+
+def __xrevrange(key, end, start, ...param)
+{
+	count = 0;
+	fields = nil;
+
+	if param != nil {
+		if param[0].lower() == 'count' {
+			count = param[1].integer();
+			if count <= 0 {
+				return handler.error('invalid count');
+			}
+		}
+		elif param[0].lower() == 'fields' {
+			fields = param[1:];
+		}
+		else {
+			return handler.error('command format error');
+		}
+	}
+
+	return ..xrevrange(key, end, start, count, fields);
+}
+
+
+def xrevrange(key, end, start, count, fields)
+{
+	return stream.db_handle.xrevrange(key, end, start, count, fields);
+}
+
+def xdel(key, ...id_list)
+{
+	return stream.db_handle.xdel(key, id_list...);
+}
+
+def __xread(...params)
+{
+	idx = 0;
+	count = nil;
+	if params[idx].lower() == 'count' {
+		count = params[idx+1].integer();
+		idx += 2;
+	}
+
+	block = nil;
+	if params[idx].lower() == 'block' {
+		block = params[idx+1].integer();
+		idx += 2;
+	}
+
+	key_id_map = {,};
+	if params[idx].lower() != 'streams' {
+		return handler.error('invalid parameter');
+	}
+	idx += 1;
+
+	c = params.size() - idx;
+	if c % 2 != 0 {
+		return handler.error('invalid param');
+	}
+
+	for i in range(0, c, 2) {
+		key = params[idx + i];
+		id = params[idx + i + 1];
+		key_id_map[key] = id;
+	}
+
+	if key == nil {
+		return handler.error('invalid param');
+	}
+
+	return ..xread(key_id_map, count, block);
+}
+def xread(key_id_map, count, block)
+{
+	return stream.db_handle.xread(key_id_map, count, block);
+}
+
+def __xtrim(key, maxlen, ...param)
+{
+	if maxlen.lower() != 'maxlen' || param == nil || param.size() < 1 {
+		return handler.error('invalid param');
+	}
+
+	count = -1;
+	if param.size() == 1 {
+		about = false;
+		count = param[0].integer();
+	}
+	elif param.size() == 2 {
+		if param[0] != '~' {
+			return handler.error('invalid param');
+		}
+
+		about = true;
+		count = param[1].integer();;
+	}
+
+	return ..xtrim(key, count, about);
+}
+
+def xtrim(key, count, about)
+{
+	return stream.db_handle.xtrim(key, count, about);
+}
+
+
+
+
+def __xgroup(subcmd, key, group, ...param)
+{
+	switch subcmd.lower()
+	{
+	case 'create':
+		if param == nil || param.size() == 0 {
+			return handler.error('insufficient param');
+		}
+		return ..xgroup_create(key, group, param[0]);
+
+	case 'destroy':
+		return ..xgroup_destroy(key, group);
+
+	case 'delconsumer':
+		if param == nil || param.size() == 0 {
+			return handler.error('insufficient param');
+		}
+		return ..xgroup_delconsumer(key, group, param[0]);
+
+	case 'setid':
+		if param == nil || param.size() == 0 {
+			return handler.error('insufficient param');
+		}
+		return ..xgroup_(key, group, param[0]);
+
+	}
+
+	return handler.error('invalid subcommand');
+}
+
+def xgroup_create(key, group, id)
+{
+	data = krill.data[key];
+	ret = stream._stream_type_check(data);
+	if ret != true {
+		return ret;
+	}
+
+	if data.GROUPS.has_key(group) {
+		return handler.error('group already exists');
+	}
+
+	g = krill.groups[group];
+	if g == nil {
+		g = stream.group.clone(group);
+		krill.groups[group] = g;
+	}
+
+	g.push_stream(key, id);
+	data.GROUPS[group] = g;
+	return 'OK';
+}
+
+
+def xgroup_destroy(key, group)
+{
+	data = krill.data[key];
+	ret = stream._stream_type_check(data);
+	if ret != true {
+		return ret;
+	}
+
+	g = data.GROUPS[group];
+	if g == nil {
+		return 0;
+	}
+
+	g.pop_stream(key);
+	data.GROUPS.erase_key(group);
+
+	if g.streams.size() == 0 {
+		krill.groups.erase_key(group);
+	}
+
+	return 1;
+}
+
+def xgroup_delconsumer(key, group, consumer)
+{
+	g = krill.groups[group];
+	if g == nil {
+		return 0;
+	}
+
+	return g.del_consumer(key, consumer);
+}
+
+def xgroup_setid(key, group, id)
+{
+	g = krill.groups[group];
+	if g == nil {
+		return handler.error('group not exists');
+	}
+
+	if !g.streams.has_key(key) {
+		return handler.error('stream invalid');
+	}
+
+	return g.set_id(key, id);
+}
+
+def __xreadgroup(GROUP, group, consumer, ...params)
+{
+	idx = 0;
+	count = nil;
+	if params[idx].lower() == 'count' {
+		count = params[idx+1].integer();
+		idx += 2;
+	}
+
+	block = nil;
+	if params[idx].lower() == 'block' {
+		block = params[idx+1].integer();
+		idx += 2;
+	}
+
+	if params[idx].lower() != 'streams' {
+		return handler.error('invalid parameter');
+	}
+	idx += 1;
+
+	key_id_map = {,};
+	c = params.size() - idx;
+	if c % 2 != 0 {
+		return handler.error('invalid param');
+	}
+
+	for i in range(0, c, 2) {
+		key = params[idx + i];
+		id = params[idx + i + 1];
+		key_id_map[key] = id;
+	}
+
+	if key == nil {
+		return handler.error('invalid param');
+	}
+
+	return ..xreadgroup(group, consumer, key_id_map, count, block);
+}
+
+def xreadgroup(group, consumer, key_id_map, count, block)
+{
+	g = krill.groups[group];
+	if g == nil {
+		return handler.error('group not exists');
+	}
+
+	result = [];
+
+	for key, id in key_id_map {
+		s_result = g.read_stream(key, consumer, id, count, block);
+		result.push_back([key, s_result]);
+	}
+
+	return result;
+}
+
+def xack(key, group, ...id_list)
+{
+	g = krill.groups[group];
+	if g == nil {
+		return handler.error('not exists');
+	}
+
+	return g.ack(key, id_list);
+}
+
+def xpending(key, group)
+{
+	g = krill.groups[group];
+	if g == nil {
+		return handler.error('not exists');
+	}
+
+	return g.pending(key);
+}
+
+def xclaim(key, group, consumer, idle_time, ...id_list)
+{
+	g = krill.data[group];
+	if g == nil {
+		return handler.error('not exists');
+	}
+
+	return g.claim(key, consumer, idle_time, id_list);
+}
+
+def __xinfo(type, key, ...param)
+{
+	switch type.lower()
+	{
+	case 'stream':
+		return ..xinfo_stream(key);
+
+	case 'groups':
+		return ..xinfo_groups(key);
+
+	case 'consumers':
+		if param == nil || param.size() == 0 {
+			return handler.error('insufficient param');
+		}
+
+		return ..xinfo_consumers(key, param[0]);
+
+	case 'help':
+		return 'todo...';
+	}
+
+	return handler.error('invalid type');
+}
+
+def xinfo_stream(key)
+{
+	data = krill.data[key];
+	ret = stream._stream_type_check(data);
+	if ret != true {
+		return ret;
+	}
+
+	result = ['length', data.size(),
+			'radix-tree-keys', 1,
+			'radix-tree-nodes', 2,
+			'groups', data.GROUPS.size()];
+
+
+	if data.size() > 0 {
+		result.push_back('last-generated-id');
+		result.push_back(stream._ts_to_id(data.last()()[0]));
+		result.push_back('first-entry');
+		result.push_back(stream._entry_to_list(data.first()()));
+		result.push_back('last-entry');
+		result.push_back(stream._entry_to_list(data.last()()));
+	}
+
+	return result;
+}
+
+def xinfo_groups(key)
+{
+	data = krill.data[key];
+	ret = stream._stream_type_check(data);
+	if ret != true {
+		return ret;
+	}
+
+	groups = data.GROUPS;
+	result = [];
+	for name, group in groups {
+		item = ['name', group.name,
+				'consumers', group.consumers.size(),
+				'pending', group.get_pending(),
+				'last-delivered-id', group.get_last_delivered_id()];
+		result.push_back(item);
+	}
+
+	return result;
+}
+
+def xinfo_consumers(key, group)
+{
+	data = krill.data[key];
+	ret = stream._stream_type_check(data);
+	if ret != true {
+		return ret;
+	}
+
+	g = data.GROUPS[group];
+	if g == nil {
+		return handler.error('group not exists');
+	}
+
+	result = [];
+	for name, c in g.consumers {
+		item = ['name', c.name,
+				'pending', c.get_pending(),
+				'idle', c.get_idle()];
+		result.push_back(item);
+	}
+
+	return result;
+}
+
+
+
+
+
+

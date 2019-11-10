@@ -1,0 +1,186 @@
+using krill;
+using krill.common;
+using krill.handler;
+
+using ipc.mutex;
+using datetime;
+using alg;
+using time;
+
+def ttl_mutex := mutex.clone();
+
+def exists(key)
+{
+	if krill.data.has_key(key) {
+		return 1;
+	}
+
+	return 0;
+}
+
+def _type(key)
+{
+	if !krill.data.has_key(key) {
+		return handler.error('not exists');
+	}
+
+	switch krill.data[key].TYPE
+	{
+	case type.string:
+		return 'string';
+
+	case type.list:
+		return 'list';
+
+	case type.map:
+		return krill.data.KRILL_TYPE;
+	}
+
+	return handler.error('unknown type');
+}
+
+def pexpireat(key, value)
+{
+	value = value.integer();
+
+	common.ttl_mutex {
+		# remove old
+		ts = krill.ttl_key_ts[key];
+		if ts != nil {
+			ts_list = krill.ttl_ts_key[ts];
+			it = ts_list.find(key);
+			if it != ts_list.end() {
+				it.erase();
+			}
+
+			krill.ttl_key_ts.erase_key(key);
+		}
+
+		krill.ttl_key_ts[key] = value;
+		ts_list = krill.ttl_ts_key[value];
+		if ts_list == nil {
+			ts_list = [];
+			krill.ttl_ts_key[value] = ts_list;
+		}
+
+		ts_list.push_back(key);
+	}
+	return 1;
+}
+
+def pexpire(key, value)
+{
+	value = value.integer();
+	now = datetime.now().timestamp();
+
+	at_ms = now*1000 + value;
+	return ..pexpireat(key, at_ms);
+}
+
+def expireat(key, value)
+{
+	return ..pexpireat(key, value*1000);
+}
+
+def expire(key, value)
+{
+	value = value.integer();
+	now = datetime.now().timestamp();
+	return ..expireat(key, now + value);
+}
+
+
+
+def pttl(key)
+{
+	if !krill.data.has_key(key) {
+		return -2;
+	}
+
+	common.ttl_mutex {
+		ts = krill.ttl_key_ts[key];
+		if ts == nil {
+			return -1;
+		}
+	}
+
+	now = datetime.now().timestamp() * 1000; # as ms
+	diff = ts - now;
+	if diff < 0 {
+		return -2;
+	}
+
+	return diff.integer();
+}
+
+def ttl(key)
+{
+	ret = ..pttl(key);
+	if ret < 0 {
+		return ret;
+	}
+
+	return (ret / 1000).integer();
+}
+
+def persist(key)
+{
+	common.ttl_mutex {
+		# remove old
+		ts = krill.ttl_key_ts[key];
+
+		ts_list = krill.ttl_ts_key[ts];
+		it = ts_list.find(key);
+		if it != ts_list.end() {
+			it.erase();
+		}
+
+		krill.ttl_key_ts.erase_key(key);
+	}
+
+	return 1;
+}
+
+
+def expire_thread()
+{
+	while krill.quit_flag == false {
+		common.ttl_mutex {
+			ts_key = krill.ttl_ts_key;
+			key_ts = krill.ttl_key_ts;
+
+			now = datetime.now().timestamp() * 1000; # as ms
+			it = ts_key.first();
+			e_it = ts_key.upper_bound(now);
+
+			while it != e_it {
+				if it == ts_key.end() {
+					break;
+				}
+
+				ts_list = it()[1];
+				for key in ts_list {
+					krill.data.erase_key(key);
+					key_ts.erase_key(key);
+				}
+
+				if it == ts_key.last() {
+					break;
+				}
+
+				it.next();
+			}
+
+			alg.erase(ts_key.first(), e_it);
+		}
+
+		time.sleep(0.1);
+
+		#print: ts_key;
+		#print: key_ts;
+	}
+}
+
+
+
+

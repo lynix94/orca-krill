@@ -1,0 +1,294 @@
+using krill;
+using krill.stream;
+
+using queue;
+using time;
+
+def init_db()
+{
+
+}
+
+def xadd(key, id, row, maxlen, about)
+{
+	data = krill.data[key];
+	if data == nil {
+		krill.data[key] = {,};
+		data = krill.data[key];
+		data.MEMBERS['KRILL_TYPE'] = 'stream';
+		data.MEMBERS['GROUPS'] = {,};
+	}
+
+	ret = stream._stream_type_check(data);
+	if ret != true {
+		return ret;
+	}
+
+	if id == '*' {
+		ts = stream._get_new_ts(data);
+	}
+	else {
+		ts = stream._id_to_ts(id);
+	}
+
+	data[ts] = row;
+	return stream._ts_to_id(ts);
+}
+
+def xlen(key)
+{
+	data = krill.data[key];
+	if data == nil {
+		return 0;
+	}
+
+	ret = stream._stream_type_check(data);
+	if ret != true {
+		return ret;
+	}
+
+	return data.size();
+}
+
+def xrange(key, start, end, count, fields)
+{
+	data = krill.data[key];
+	ret = stream._stream_type_check(data);
+	if ret != true {
+		return ret;
+	}
+
+	start_ts = stream._id_to_ts(start);
+	s_it = data.lower_bound(start_ts);
+
+	end_ts = stream._id_to_ts(end);
+	e_it = data.upper_bound(end_ts);
+
+	result = [];
+
+	while s_it != e_it {
+		result.push_back(stream._entry_to_list(s_it()));	
+		if count > 0 && result.size() >= count {
+			break;
+		}
+
+		if s_it == data.last() {
+			break;
+		}
+
+		s_it.next();
+	}
+
+	return result;
+}
+
+def xrevrange(key, end, start, count, fields)
+{
+	data = krill.data[key];
+	ret = stream._stream_type_check(data);
+	if ret != true {
+		return ret;
+	}
+
+	end_ts = stream._id_to_ts(end);
+	start_ts = stream._id_to_ts(start);
+
+	e_it = data.upper_bound(end_ts);
+	s_it = data.lower_bound(start_ts);
+	result = [];
+
+	while e_it != s_it {
+		if e_it == data.first() {
+			break;
+		}
+		e_it.prev();
+
+		result.push_back(stream._entry_to_list(e_it()));
+		if count > 0 && result.size() >= count {
+			break;
+		}
+	}
+
+	return result;
+}
+
+def xdel(key, ...id_list)
+{
+	data = krill.data[key];
+	ret = stream._stream_type_check(data);
+	if ret != true {
+		return ret;
+	}
+
+	count = 0;
+	for id in id_list {
+		ts = stream._id_to_ts(id);
+		if data.has_key(ts) {
+			count += 1;
+			data.erase_key(ts);
+		}
+	}
+
+	return count;
+}
+
+def xread(key_id_map, count, block)
+{
+	key_ts_map = {,};
+	for key, id in key_id_map {
+		if id == '$' {
+			data = krill.data[key];
+			ts = stream._get_new_ts(data);
+		}
+		else {
+			ts = stream._id_to_ts(id);
+		}
+
+		key_ts_map[key] = ts;
+	}
+
+	result = [];
+	for key, ts in key_ts_map {
+		data = krill.data[key];
+		ret = stream._stream_type_check(data);
+		if ret != true {
+			continue;
+		}
+
+		key_result = [];
+		s_it = data.lower_bound(ts);
+		while s_it != data.end() {
+			key_result.push_back(stream._entry_to_list(s_it()));
+			if s_it == data.last() {
+				break;
+			}
+			s_it.next();
+		}
+
+		if key_result.size() > 0 {
+			result.push_back([key, key_result]);
+		}
+
+		if count != nil && result.size() > count {
+			break;
+		}
+	}
+
+	if result.size() == 0 && block != nil {
+		return ('block', key_ts_map.keys(), block, ..xread2, (key_ts_map, count));
+	}
+
+	return result;
+}
+
+def xread2(key_ts_map, count)
+{
+	result = [];
+	for key, ts in key_ts_map {
+		data = krill.data[key];
+		ret = stream._stream_type_check(data);
+		if ret != true {
+			continue;
+		}
+
+		key_result = [];
+		s_it = data.lower_bound(ts);
+		while s_it != data.end() {
+			key_result.push_back(stream._entry_to_list(s_it()));
+			if s_it == data.last() {
+				break;
+			}
+			s_it.next();
+		}
+
+		if key_result.size() > 0 {
+			result.push_back([key, key_result]);
+		}
+
+		if count != nil && result.size() > count {
+			break;
+		}
+	}
+
+	if result.size() == 0 {
+		return nil;
+	}
+
+	return result;
+}
+
+def xtrim(key, count, about)
+{
+	data = krill.data[key];
+	ret = stream._stream_type_check(data);
+	if ret != true {
+		return ret;
+	}
+
+	cur_size = data.size();
+	del_count = cur_size - count;
+	if del_count <= 0 {
+		return 0;
+	}
+
+	// TODO: about
+	count = 0;
+	for i in range(del_count) {
+		data.first().erase();
+		count += 1;
+		if data.size() == 0 {
+			break;
+		}
+	}
+	
+	return count;
+}
+
+
+def min(key)
+{
+	data = krill.data[key];
+	if data == nil {
+		return 0.0;
+	}
+
+	ret = stream._stream_type_check(data);
+	if ret != true {
+		return nil;
+	}
+
+	if data.size() == 0 {
+		return 0.0;
+	}
+
+	return data.first().key();
+}
+
+def move(key, count, dst_db)
+{
+	data = krill.data[key];
+	ret = stream._stream_type_check(data);
+	if ret != true {
+		return false;
+	}
+
+	if data.size() < count {
+		count = data.size();
+	}
+ 
+	for i in range(count) {
+		k = data.first().key();
+		v = data.first().value();
+
+		data.first().erase();
+		dst_db.xadd(key, k, v);
+	}
+
+	return count;
+}
+
+def dump()
+{
+	print: krill.data;
+}
+

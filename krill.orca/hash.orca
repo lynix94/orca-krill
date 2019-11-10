@@ -1,0 +1,167 @@
+using krill;
+using krill.handler;
+
+def _hash_type_check(data)
+{
+	if data.TYPE != {,}.TYPE {
+		return handler.error('type error');
+	}
+	elif data.KRILL_TYPE != 'hash' {
+		return handler.error('type error');
+	}
+
+	return true;
+}
+
+def hset(key, hkey, value)
+{
+	data = krill.data[key];
+
+	if data == nil {
+		krill.data[key] = {,};
+		data = krill.data[key];
+		data.MEMBERS['KRILL_TYPE'] = 'hash';
+	}
+	ret = .._hash_type_check(data);
+	if ret != true {
+		return ret;
+	}
+
+	exists = data.has_key(hkey);
+	data[hkey] = value;
+
+	if exists {
+		return 0;
+	}
+	
+	return 1;
+}
+
+def hdel(key, hkey)
+{
+	data = krill.data[key];
+	ret = .._hash_type_check(data);
+	if ret != true {
+		return ret;
+	}
+
+	if !data.has_key(hkey) {
+		return 0;
+	}
+
+	data.erase_key(hkey);
+	return 1;
+}
+
+
+def hget(key, hkey)
+{
+	data = krill.data[key];
+
+	if data.TYPE == nil.TYPE {
+		return nil;
+	}
+	ret = .._hash_type_check(data);
+	if ret != true {
+		return ret;
+	}
+
+	if !data.has_key(hkey) {
+		return nil;
+	}
+
+	return data[hkey];
+}
+
+
+def hlen(key)
+{
+	data = krill.data[key];
+
+	if data.TYPE == nil.TYPE {
+		return 0;
+	}
+
+	if data.TYPE != {,}.TYPE {
+		return handler.error('type error');
+	}
+
+	return data.size();
+}
+
+def hkeys(key)
+{
+	data = krill.data[key];
+
+	if data.TYPE == nil.TYPE {
+		return [];
+	}
+
+	ret = .._hash_type_check(data);
+	if ret != true {
+		return ret;
+	}
+
+	return data.keys();
+}
+
+def hvals(key)
+{
+	data = krill.data[key];
+
+	if data.TYPE == nil.TYPE {
+		return [];
+	}
+
+	ret = .._hash_type_check(data);
+	if ret != true {
+		return ret;
+	}
+
+	return data.values();
+}
+
+def hgetall(key)
+{
+	data = krill.data[key];
+
+	if data.TYPE == nil.TYPE {
+		return [];
+	}
+
+	ret = .._hash_type_check(data);
+	if ret != true {
+		return ret;
+	}
+
+	ret = [];
+	for k, v in data {
+		ret.push_back(k);
+		ret.push_back(v);
+	}
+	
+	return ret;
+}
+
+def hexists(key, hkey)
+{
+	data = krill.data[key];
+
+	if data.TYPE == nil.TYPE {
+		return 0;
+	}
+
+	ret = .._hash_type_check(data);
+	if ret != true {
+		return ret;
+	}
+
+	if data.has_key(hkey) {
+		return 1;
+	}
+
+	return 0;
+}
+
+
+

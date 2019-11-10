@@ -1,0 +1,38 @@
+using krill;
+using krill.handler;
+using krill.script;
+
+def set(key, value)
+{
+	krill.data[key] = value;
+	return 'OK';
+}
+
+def getset(key, value)
+{
+	old_value = krill.data[key];
+	krill.data[key] = value;
+	return old_value;
+}
+
+def get(key)
+{
+	value = krill.data[key];
+	return value;
+}
+
+def del(...keys)
+{
+	data = krill.data;
+
+	count = 0;
+	idx = 0;
+	for key in keys {
+		data.erase_key(key);
+		idx += 1;
+		count += 1;
+	}
+
+	return count;
+}
+

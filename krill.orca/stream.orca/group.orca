@@ -1,0 +1,212 @@
+using krill;
+using krill.stream;
+using datetime;
+
+def name;
+def consumers := {,};
+def streams := {,};
+def pendings := {,};
+def blockings := {,};
+
+def init(name)
+{
+	..name = name;
+}
+
+def push_stream(key, id)
+{
+	data = krill.data[key];
+	ret = stream._stream_type_check(data);
+	if ret != true {
+		return ret;
+	}
+
+	if id == '$' {
+		ts = stream._get_new_ts(data);
+	}
+	else {
+		ts = stream._id_to_ts(id);
+	}
+
+	..streams[key] = ts;
+	return true;
+}
+
+def pop_stream(key)
+{
+	..streams.erase_key(key);
+	return true;
+}
+
+def del_consumer(key, consumer)
+{
+	data = krill.data[key];
+	ret = stream._stream_type_check(data);
+	if ret != true {
+		return ret;
+	}
+
+	c = data.CONSUMERS[consumer];
+	if c != nil {
+		c.pop_stream(key);
+		if c.streams.size() == 0 {
+			data.CONSUMERS.erase_key(consumer);
+		}
+	}
+
+	return true;
+}
+
+def set_id(key, id)
+{
+	if ..streams.has_key(key) {
+		..streams[key] = id;
+	}
+}
+
+def get_pending()
+{
+	return 0;
+}
+
+def get_last_delivered_id()
+{
+	return 0;
+}
+
+def read_stream(key, consumer, id, count, block)
+{
+	data = krill.data[key];
+	ret = stream._stream_type_check(data);
+	if ret != true {
+		return ret;
+	}
+
+	if id == '>' {
+		ts = datetime.now().timestamp();
+	}
+	else {
+		ts = stream._id_to_ts(id);
+	}
+	
+	result = [];
+	s_it = data.upper_bound(ts);
+	if s_it == data.end() {
+		if block == nil {
+			return [];
+		}
+
+		'''
+		ts_map = ..blockings[key];
+		if ts_map == nil {
+			ts_map = {,};
+			..blockings[key] = ts_map;
+		}
+		''';
+	}
+
+	while true {
+		if count != nil && result.size() >= count {
+			break;
+		}
+
+		result.push_back(stream._entry_to_list(s_it()));
+		if s_it == data.last() {
+			break;
+		}
+		s_it.next();
+	}
+	
+	return result;
+}
+
+def ack(key, id_list)
+{
+	count = 0;
+
+	ts_map = ..pendings[key];
+	if ts_map == nil {
+		return 0;
+	}
+
+	for id in id_list {
+		ts = stream._id_to_ts(id);
+		p = ts_map[ts];
+		if p == nil {
+			continue;
+		}
+
+		ts_map.erase_key(ts);
+		count += 1;
+	}
+	
+	return count;
+}
+
+def pending(key)
+{
+	ts_map = ..pendings[key];
+	if ts_map == nil {
+		return [0];
+	}
+
+	c_map = {,};
+	for ts, c in ts_map {
+		if !c_map.has_key(c) {
+			c_map[c] = 1;
+		}
+		else {
+			c_map[c] += 1;
+		}
+	}
+
+	consumers = [];
+	for k, v in c_map {
+		consumers.push_back([k, v]);
+	}
+
+	result = [ts_map.size(),
+			stream._ts_to_id(ts_map.first().key()),
+			stream._ts_to_id(ts_map.last().key())
+			, consumers];
+
+	return result;
+}
+
+def claim(key, consumer, idle_time, id_list)
+{
+	data = krill.data[key];
+	ret = stream._stream_type_check(data);
+	if ret != true {
+		return ret;
+	}
+
+	ts_map = ..pendings[key];
+	if ts_map == nil {
+		return [0];
+	}
+
+	result = [];
+	for id in id_list {
+		ts = stream._id_to_ts(id);
+		c_ts = ts_map[ts];
+		if c_ts == nil {
+			return [];
+		}
+
+		idle = idle_time.float() / 1000;
+		now = datetime.now().timestamp();
+		if now - c_ts[1] < idle {
+			continue;
+		}
+
+		ts_map[ts] = (consumer, now);
+
+		row = data[ts];
+		result.push_back(stream._entry_to_list([ts, row]));
+	}
+
+	return result;
+}
+
+

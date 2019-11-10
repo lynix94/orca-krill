@@ -1,0 +1,290 @@
+using krill;
+using krill.handler;
+
+
+def _zset_type_check(data)
+{
+	if data == nil {
+		return handler.error('not exists');
+	}
+	elif data.TYPE != {,}.TYPE {
+		return handler.error('type error');
+	}
+	elif data.KRILL_TYPE != 'zset' {
+		return handler.error('type error');
+	}
+
+	return true;
+}
+
+def zadd(key, ...subkeys)
+{
+	count = 0;
+	idx = 0;
+	while idx + 1 < subkeys.size() {
+		subkey = subkeys[idx];
+		score = subkeys[idx+1].integer();
+
+		data = krill.data[key];
+		if data == nil {
+			krill.data[key] = {,};
+			data = krill.data[key];
+			data.MEMBERS['KRILL_TYPE'] = 'zset';
+			data.MEMBERS['REVERSE'] = {,};
+		}
+
+		ret = .._zset_type_check(data);
+		if ret != true {
+			return ret;
+		}
+
+		data[subkey] = score;
+		rev = data.REVERSE[score];
+		if rev == nil {
+			rev = [];
+			data.REVERSE[score] = rev;
+		}
+		rev.push_back(subkey);
+
+		idx += 2;
+		count += 1;
+	}
+
+	return count;
+}
+
+def zrange_helper(key, start, end, withscores, reverse)
+{
+	data = krill.data[key];
+	ret = .._zset_type_check(data);
+	if ret != true {
+		return ret;
+	}
+
+	result = [];
+	score_list = data.REVERSE.keys()[start:end+];
+
+	for score in score_list {
+		if reverse {
+			rev = data.REVERSE[score];
+			for r in rev {
+				if withscores {
+					result.push_front(score);
+				}
+				result.push_front(r);
+			}
+		}
+		else {
+			rev = data.REVERSE[score];
+			for r in rev {
+				result.push_back(r);
+				if withscores {
+					result.push_back(score);
+				}
+			}
+		}
+	}
+
+	return result;
+}
+
+def __zrange(key, start, end, param)
+{
+	withscores = false;
+	if param != nil && param.lower() == 'withscores'{
+		withscores = true;
+	}
+
+	return ..zrange(key, start, end, withscores);
+}
+
+def zrange(key, start, end, withscores)
+{
+	start = start.integer();
+	end = end.integer();
+	return ..zrange_helper(key, start, end, withscores, false);
+}
+
+def __zrevrange(key, start, end, param)
+{
+	withscores = false;
+	if param != nil && param.lower() == 'withscores'{
+		withscores = true;
+	}
+
+	return ..zrevrange(key, start, end, withscores);
+}
+
+def zrevrange(key, start, end, withscores)
+{
+	start = start.integer();
+	end = end.integer();
+	return ..zrange_helper(key, start, end, withscores, true);
+}
+
+
+def __zrangebyscore(key, min, max, ...param)
+{
+	withscores = false;
+	if param != nil && param.size() >= 1 && param[0].lower() == 'withscores'{
+		withscores = true;
+	}
+
+	offset = 0;
+	count = 1024*1024; # TODO
+	if param != nil && param.size() == 4 { 
+		if param[1].lower() != 'limit' {
+			return handler.error('not a limit');
+		}
+
+		offset = param[2].integer();
+		count = param[3].integer();
+	}
+
+	return ..zrangebyscore(key, min, max, withscores, offset, count);
+}
+
+def zrangebyscore(key, min, max, withscores, offset, count)
+{
+	min = min.integer();
+	max = max.integer();
+
+	# TODO: inf, (
+
+	data = krill.data[key];
+	ret = .._zset_type_check(data);
+	if ret != true {
+		return ret;
+	}
+
+	start = data.REVERSE.lower_bound(min);
+	end = data.REVERSE.upper_bound(max);
+	result = [];
+
+	while start != end {
+		item = start();
+
+		for i in item[1] {
+			result.push_back(i);
+			if withscores {
+				result.push_back(item[0]);
+			}
+		}
+
+		start.next();
+	}
+
+	return result;
+}
+
+def zcard(key)
+{
+	data = krill.data[key];
+	if data == nil {
+		return 0;
+	}
+	ret = .._zset_type_check(data);
+	if ret != true {
+		return ret;
+	}
+
+	return data.size();
+}
+
+def zincrby(key, inc, subkey)
+{
+	data = krill.data[key];
+	ret = .._zset_type_check(data);
+	if ret != true {
+		return ret;
+	}
+
+	score = data[subkey];
+	if score == nil {
+		return handler.error('not exists');
+	}
+
+	data.REVERSE[score].find(subkey).erase();
+	score += inc;
+	new_rev = data.REVERSE[score];
+	if new_rev == nil {
+		new_rev = [];
+		data.REVERSE[score] = new_rev;
+	}
+	new_rev.push_back(subkey);
+
+	return score;
+}
+
+def zrem(key, ...subkeys)
+{
+	data = krill.data[key];
+	ret = .._zset_type_check(data);
+	if ret != true {
+		return ret;
+	}
+
+	count = 0;
+	for subkey in subkeys {
+		score = data[subkey];
+		if score == nil {
+			continue;
+		}
+
+		data.REVERSE[score].find(subkey).erase();
+		data.erase_key(subkey);
+		count += 1;
+	}
+
+	return count;
+}
+
+def zremrangebyscore(key, min, max)
+{
+	min = min.integer();
+	max = max.integer();
+
+	# TODO: inf, (
+
+	data = krill.data[key];
+	ret = .._zset_type_check(data);
+	if ret != true {
+		return ret;
+	}
+
+	start = data.REVERSE.lower_bound(min);
+	end = data.REVERSE.upper_bound(max);
+	erase_list = [];
+
+	while start != end {
+		item = start();
+		erase_list.push_back(item[1]...);
+		start.next();
+	}
+
+	data.REVERSE.erase(start, end);
+	
+	for k in erase_list {
+		data.erase_key(k);
+	}
+
+	return erase_list.size();
+}
+
+
+def zscore(key, subkey)
+{
+	data = krill.data[key];
+	ret = .._zset_type_check(data);
+	if ret != true {
+		return ret;
+	}
+
+	score = data[subkey];
+	if score == nil {
+		return handler.error('not exists');
+	}
+
+	return score;
+}
+

@@ -1,0 +1,409 @@
+using krill;
+using krill.handler;
+using krill.common;
+using krill.stream;
+using krill.script;
+
+using encoding.resp;
+using socket;
+using thread;
+using time;
+using queue;
+using ipc.mutex;
+using alg;
+using fun;
+
+
+def data := {,};
+def data_mutex := mutex.clone();
+
+def groups := {,};
+
+def ttl_ts_key := {,}; # ts_key map
+def ttl_key_ts := {,}; # key_ts map
+
+
+def quit_flag := false;
+
+def quit()
+{
+	..quit_flag = true;
+	..krill.data = nil;
+	return nil;
+}
+
+
+
+def init_krill()
+{
+	def inited := false;
+
+	if my.inited == true {
+		return;
+	}
+
+	my.inited = true;
+
+	handler.init_handler();
+	stream.init_stream();
+
+	parallel common.expire_thread();
+}
+
+
+
+def client
+{
+	def sock;
+	def q;
+
+	def init(sock)
+	{
+		..sock = sock;
+	}
+
+	def recv()
+	{
+		return ..sock.recv();
+	}
+
+	def send(msg)
+	{
+		return ..sock.send(msg);
+	}
+
+	def close()
+	{
+		..sock.close();
+	}
+}
+
+def server(port) {
+	..init_krill();
+
+	sock = socket.create();
+	sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1);
+	sock.bind(port);
+	sock.listen();
+
+	while krill.quit_flag == false {
+		s = sock.accept();
+		c = krill.client.clone(s);
+		#parallel my.process_request(c);
+		thread.run(my.process_request, c);
+	}
+
+	def process_request(client)
+	{
+		while true {
+			try {
+				msg = client.recv();
+				if msg.starts_with('*') {
+					v = resp.decoding(msg);
+				}
+				else {
+					v = msg.strip().split(' ');
+				}
+
+				#print: v;
+
+				k = v[0].upper();
+				cmd = handler.command_table[k];
+				if cmd == nil {
+					client.send('-not implemented yet\r\n');
+					continue;
+				}
+
+				if v.size()  < cmd[1] {
+					client.send('-insuffienct param\r\n');
+					continue;
+				}
+
+				if cmd[2] >= 0 && v.size()  > cmd[2] {
+					client.send('-too many param\r\n');
+					continue;
+				}
+
+				# special krill command
+				if k == 'GETSET' && v.size() > 0 && v[1].starts_with('krill:') {
+					ret = ..krill_handler(v);
+				}
+				else {
+					# normal command with mutex
+					v.pop_front();
+
+					# script kill should be called outside of mutex
+					if k == 'SCRIPT' && v.size() > 0 && v[0].lower() == 'kill' {
+						script.script_kill();
+					}
+
+					krill.data_mutex {
+						ret = cmd[0](v...);
+						if ret.TYPE == type.tuple && ret[0] == 'block' {
+							key_list = ret[1];
+							krill.add_block(key_list, client);
+						}
+					}
+
+					# process block, join command without mutex
+					if ret.TYPE == type.tuple && ret[0] != '-' {
+						ret = ..process_post(client, ret);
+					}
+				}
+
+				result = ..make_response(ret);
+				#print('> ', result);
+				client.send(result);
+
+				if krill.quit_flag {
+					client.close();
+					break;
+				}
+			}
+			catch io.socket.disconn {
+				print: 'client disconnected';
+				break;
+			}
+			catch any as e {
+				print: e.who();
+				print: e.what();
+				print: e.print_trace();
+				msg = e.what();
+				msg = msg.replace('\n', '\\n');
+				msg = msg.replace('\r', '\\r');
+				client.send('-%s\r\n' % msg);
+			}
+		}
+	}
+
+	def make_response(msg)
+	{
+		switch msg.TYPE
+		{
+		case type.bool:
+			if msg == true {
+				return ':1\r\n';
+			}
+
+			return ':0\r\n';
+
+		case type.tuple:
+			if msg[0] == '-' {
+				return '-' + msg[1] + '\r\n';
+			}
+			else {
+				return '-internal error\r\n';
+			}
+
+		case type.integer:
+			return ':%d\r\n' % msg;
+
+		case type.string:
+			l = msg.length();
+			if l < 10 {
+				return '+' + msg + '\r\n';
+			}
+			else {
+				return '$%d\r\n%s\r\n' % (msg.length(), msg);
+			}
+
+		case type.list:
+			return resp.encoding(msg);
+
+		case nil.TYPE:
+			return '$-1\r\n';
+		}
+
+		return '-unknown type\r\n';
+	}
+
+	def krill_handler(v)
+	{
+		toks = v[1].split(':');
+		ret = my;
+
+		if toks.size() >= 3 {
+			switch toks[1]
+			{
+			case 'script':
+				if toks.size() < 4 {
+					return handler.error('krill prefix is reserved');
+				}
+
+				value = nil;
+				if v.size() >= 3 {
+					value = v[2];
+				}
+
+				switch toks[2]
+				{
+				case 'get': # krill:script:get:name
+					ret = script.krill_script_get(toks[3]);
+
+				case 'set': # krill:script:set:name
+					ret = script.krill_script_set(toks[3], value);
+
+				case 'del': # krill:script:del:name
+					ret = script.krill_script_del(toks[3]);
+
+				case 'run': # krill:script:run:name
+					ret = script.krill_script_run(toks[3], value);
+
+				case 'runnings': # krill:script:runnings:name | * 
+					ret = script.krill_script_runnings(toks[3]);
+
+				case 'stop': # krill:script:stop:tid
+					ret = script.krill_script_stop(toks[3]);
+
+				case 'join': # krill:script:join:tid
+					ret = script.krill_script_join(toks[3]);
+				}
+
+			case 'mutex':
+				switch toks[2]
+				{
+				case 'lock': # krill:mutex:lock
+					krill.data_mutex.lock();
+					ret = 1;
+
+				case 'trylock': # krill:mutex:trylock
+					ret = krill.data_mutex.trylock();
+
+				case 'unlock': # krill:mutex:unlock
+					krill.data_mutex.unlock();
+					ret = 1;
+				}	
+			}
+		}
+
+		if ret == my { # untouched
+			ret = handler.error('krill prefix is reserved');
+		}
+		return ret;
+	}
+
+	def process_post(client, ret)
+	{
+		switch ret[0]
+		{
+		case 'block': # try block again
+			# ( 'block', key_list, timeout, fptr, params )
+			key_list = ret[1];
+			timeout = ret[2];
+			fptr = ret[3];
+			params = ret[4];
+
+			select
+			{
+			case client.q -> ret:
+				krill.data_mutex {
+					ret = fptr(params...);
+					krill.remove_block(key_list, client);
+				}
+
+			case time.timer(timeout.float()/1000) -> ret:
+				krill.data_mutex {
+					ret = nil;
+					krill.remove_block(key_list, client);
+				}
+			}
+
+		default:
+			ret = handler.error('internal error: unknown command');
+		}
+
+		return ret;
+	}
+}
+
+
+
+
+
+
+def blockings := {,};
+
+def add_block(key_list, client)
+{
+	#print: '>>> add block: ', key_list, client.ID;
+	if client.q == nil {
+		client.q = queue.clone(1);
+	}
+
+	for key in key_list {
+		c_list = ..blockings[key];
+		if c_list == nil {
+			c_list = [];
+			..blockings[key] = c_list;
+		}
+
+		c_list.push_back(client);
+	}
+}
+
+def remove_block(key_list, client)
+{
+	#print: '>>> remove block: ', key_list, client.ID;
+	for key in key_list {
+		c_list = ..blockings[key];
+		it = c_list.find(client);
+		if it != c_list.end() {
+			it.erase();
+		}
+
+		if c_list.size() == 0 {
+			..blockings.erase_key(key);
+		}
+	}
+}
+
+def signal_block(key)
+{
+	#print: '>>> signal block: ', key;
+	c_list = ..blockings[key];
+	if c_list == nil || c_list.size() == 0 {
+		return;
+	}
+
+	c = c_list[0];
+	c_list.pop_front();
+	c.q <- true;
+}
+
+
+# below two api are used for script
+def script_wait_key(key)
+{
+	c = krill.client.clone(nil);
+	c.q = queue.clone(1);
+
+	c_list = ..blockings[key];
+	if c_list == nil {
+		c_list = [];
+		..blockings[key] = c_list;
+	}
+
+	c_list.push_back(c);
+
+	return c.q;
+}
+
+# clean up in case of garbage channel exists
+def script_clear_waitings(key)
+{
+	c_list = ..blockings[key];
+	if c_list == nil {
+		return;
+	}
+
+	while true {
+		it = alg.find_if(c_list.first(), c_list.end(), lambda(c) { return c.sock == nil; });
+		if it == c_list.end() {
+			break; # not exists anymore
+		}
+		else {
+			it.erase();
+		}
+	}
+}
+

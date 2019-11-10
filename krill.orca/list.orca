@@ -1,0 +1,211 @@
+using krill;
+using krill.handler;
+
+def lpush(key, ...values)
+{
+	data = krill.data[key];
+
+	if data == nil {
+		krill.data[key] = [];
+		data = krill.data[key];
+	}
+	elif data.TYPE != [].TYPE {
+		return handler.error('type error');
+	}
+
+	for value in values {
+		data.push_front(value);
+		krill.signal_block(key);
+	}
+
+	return data.size();
+}
+
+def rpush(key, ...values)
+{
+	data = krill.data[key];
+
+	if data == nil {
+		krill.data[key] = [];
+		data = krill.data[key];
+	}
+	elif data.TYPE != [].TYPE {
+		return handler.error('type error');
+	}
+
+	for value in values {
+		data.push_back(value);
+		krill.signal_block(key);
+	}
+
+	return data.size();
+}
+
+def lpop(key)
+{
+	data = krill.data[key];
+
+	if data.TYPE != [].TYPE {
+		return handler.error('type error');
+	}
+
+	if data.size() == 0 {
+		return nil;
+	}
+
+	value = data[0];
+	data.pop_front();
+	return value;
+}
+
+def rpop(key)
+{
+	data = krill.data[key];
+
+	if data.TYPE != [].TYPE {
+		return handler.error('type error');
+	}
+
+	if data.size() == 0 {
+		return nil;
+	}
+
+	value = data[-1];
+	data.pop_back();
+	return value;
+}
+
+def blpop(...key_list_timeout)
+{
+	if key_list_timeout.size() < 2 {
+		return handler.error('insufficient params');
+	}
+
+	key_list = key_list_timeout[:-1];
+	timeout = key_list_timeout[-1].integer()*1000;
+
+	for key in key_list {
+		data = krill.data[key];
+		if data.TYPE != [].TYPE || data.size() == 0 {
+			continue;
+		}
+
+		value = data[0];
+		data.pop_front();
+		return [key, value];
+	}
+
+	return ('block', key_list, timeout, blpop, key_list_timeout);
+}
+
+def brpop(...key_list_timeout)
+{
+	if key_list_timeout.size() < 2 {
+		return handler.error('insufficient params');
+	}
+
+	key_list = key_list_timeout[:-1];
+	timeout = key_list_timeout[-1].integer()*1000;
+
+	for key in key_list {
+		data = krill.data[key];
+		if data.TYPE != [].TYPE || data.size() == 0 {
+			continue;
+		}
+
+		value = data[-1];
+		data.pop_back();
+		return [key, value];
+	}
+
+	return ('block', key_list, timeout, brpop, key_list_timeout);
+}
+
+def llen(key)
+{
+	data = krill.data[key];
+
+	if data == nil {
+		krill.data[key] = [];
+		data = krill.data[key];
+	}
+	elif data.TYPE != [].TYPE {
+		return handler.error('type error');
+	}
+
+	return data.size();
+}
+
+def lindex(key, index)
+{
+	index = index.integer();
+	data = krill.data[key];
+
+	if data.TYPE != [].TYPE {
+		return handler.error('type error');
+	}
+
+	try {
+		value = data[index];
+	}
+	catch orca.index {
+		return nil;
+	}
+
+	return value;
+}
+
+
+def lset(key, index, value)
+{
+	index = index.integer();
+	data = krill.data[key];
+
+	if data.TYPE != [].TYPE {
+		return handler.error('type error');
+	}
+
+	try {
+		data[index] = value;
+	}
+	catch orca.index {
+		return handler.error('out of index');
+	}
+
+	return 'OK';
+}
+
+def lrange(key, start, end)
+{
+	s = start = start.integer();
+	e = end = end.integer();
+	data = krill.data[key];
+
+	if data.TYPE != [].TYPE {
+		return handler.error('type error');
+	}
+
+	size = data.size();
+	if s < 0 {
+		s += size;
+	}
+	if e < 0 {
+		e += size;
+	}
+	if s > e {
+		return handler.error('out of index');
+	}
+
+	try {
+		value = data[start:end+];
+	}
+	catch orca.index {
+		return handler.error('out of index');
+	}
+
+	return value;
+}
+
+
+
+

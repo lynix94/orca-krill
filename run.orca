@@ -1,0 +1,12 @@
+using krill;
+
+if argv == nil {
+	port = 6379;
+}
+else {
+	port = argv[0].integer();
+}
+
+print: 'start krill server on port %d' % port;
+krill.server(port);
+

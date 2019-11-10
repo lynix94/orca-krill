@@ -1,0 +1,270 @@
+using krill;
+using krill.handler;
+
+using thread;
+using crypto;
+
+def scripts := {,};
+def id_th_map := {,};
+def current_thread := nil;
+
+def thread_runner(obj, p1, p2)
+{
+	ret = nil;
+	try {
+		ret = obj(p1, p2);
+	}
+	catch any as e {
+		print: '[ERROR] script exception: ', e.what();
+	}
+
+	krill.script_clear_waitings(obj);
+	return ret;
+}
+
+def _eval(script, numkey, ...params)
+{
+	numkey = numkey.integer();
+	if params == nil {
+		params = [];
+	}
+
+	if params.size() < numkey {
+		return handler.error('insufficient params');
+	}
+	
+	obj = compile('sha1', script);
+	if obj == nil {
+		return handler.error('compile error');
+	}
+
+	keys = params[:numkey];
+	args = params[numkey:];
+
+	th = thread.run(..thread_runner, obj, keys, args);
+	..current_thread = th;
+	ret = th.join();
+	..current_thread = nil;
+
+	if ret.TYPE == type.tuple {
+		ret = ret.list();
+	}
+
+	return ret;
+}
+
+
+def evalsha(sha1, numkey, ...params)
+{
+	numkey = numkey.integer();
+	if params == nil {
+		params = [];
+	}
+
+	if params.size() < numkey {
+		return handler.error('insufficient params');
+	}
+
+	item = ..scripts[sha1];
+	if item == nil {
+		return handler.error('script not found');
+	}
+	obj = item[1];
+
+	keys = params[:numkey];
+	args = params[numkey:];
+
+	th = thread.run(obj, keys, args);
+	..current_thread = th;
+	ret = th.join();
+	..current_thread = nil;
+
+	if ret.TYPE == type.tuple {
+		ret = ret.list();
+	}
+
+	return ret;
+}
+
+def script(sub_command, ...params)
+{
+	switch sub_command.lower()
+	{
+	case 'load':
+		if params == nil || params.size() < 1 {
+			return handler.error('insufficient params');
+		}
+
+		return ..script_load(params[0]);
+
+	case 'exists':
+		if params == nil || params.size() < 1 {
+			return handler.error('insufficient params');
+		}
+
+		return ..script_exists(params[0]);
+
+	case 'flush':
+		return ..script_flush();
+
+	case 'kill':
+		return ..script_kill();
+
+	case 'debug':
+		return handler.error('not supported yet');
+	}
+
+	return handler.error('invalid subcommand');
+}
+
+def script_load(source)
+{
+	s = crypto.sha1.clone();
+	s.write(source);
+	sha1 = s.sum();
+	if ..scripts.has_key(sha1) {
+		return; // already exists
+	}
+
+	obj = compile('sha1', source);
+	if obj == nil {
+		return handler.error('compile error');
+	}
+
+	..scripts[sha1] = (source, obj);
+	
+	return sha1;
+}
+
+def script_exists(...sha1_list)
+{
+	ret = [];
+
+	for sha1 in sha1_list {
+		if ..scripts.has_key(sha1) {
+			ret.push_back(1);
+		}
+		else {
+			ret.push_back(0);
+		}
+	}
+
+	return ret;
+}
+
+def script_flush()
+{
+	..scripts.clear();
+	return 'OK';
+}
+
+def script_kill()
+{
+	if ..current_thread != nil {
+		..current_thread.stop();
+	}
+
+	return 'OK';
+}
+
+
+
+def krill_scripts := {,};
+
+def krill_script_set(name, source)
+{
+	obj = compile(name, source);
+	if obj == nil {
+		return handler.error('compile error');
+	}
+
+	..krill_scripts[name] = (source, obj);
+	return 'OK';
+}
+
+def krill_script_get(name)
+{
+	ret = ..krill_scripts[name];
+	if ret == nil {
+		return nil;
+	}
+
+	return ret[0];
+}
+
+def krill_script_runnings(name)
+{
+	result = '';
+
+	for id, name_th in ..id_th_map {
+		if name == '*' {
+			result += '%s %d\r\n' % (name_th[0], id);
+		}
+		elif name == name_th[0] {
+			result += '%s %d\r\n' % (name_th[0], id);
+		}
+	}
+
+	return result;
+}
+
+def krill_script_run(name, param)
+{
+	item = ..krill_scripts[name];
+	if item == nil {
+		return handler.error('not exists');
+	}
+
+	obj = item[1].clone();
+	th = thread.run(..thread_runner, obj, param);
+	..id_th_map[th.ID] = (name, th);
+
+	return '%d' % th.ID;
+}
+
+def krill_script_join(id)
+{
+	id = id.integer();
+
+	ret = ..id_th_map[id];
+	if ret == nil {
+		return handler.error('not exists');
+	}
+
+	ret[1].join();
+	..id_th_map.erase_key(id);
+	return 'OK';
+}
+
+def krill_script_stop(id)
+{
+	id = id.integer();
+
+	ret = ..id_th_map[id];
+	if ret == nil {
+		return handler.error('not exists');
+	}
+
+	ret[1].stop();
+	..id_th_map.erase_key(id);
+	return 'OK';
+}
+
+def krill_script_del(name)
+{
+	if ..krill_scripts.has_key(name) {
+		..krill_scripts.erase_key(name);
+		return 1;
+	}
+
+	return 0;
+}
+
+
+
+
+
+
+
+
+

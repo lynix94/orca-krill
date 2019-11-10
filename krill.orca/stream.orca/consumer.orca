@@ -1,0 +1,40 @@
+
+def consumer
+{
+	def name;
+	def streams := {,};
+
+	def init(name)
+	{
+		..name = name;
+	}
+
+	def push_stream(key)
+	{
+		data = krill.data[key];
+		ret = stream._stream_type_check(data);
+		if ret != true {
+			return ret;
+		}
+
+		..streams[key] = true;
+		return true;
+	}
+
+	def pop_stream(key)
+	{
+		..streams.erase_key(key);
+		return true;
+	}
+
+	def get_pending()
+	{
+		return 0;
+	}
+
+	def get_idle()
+	{
+		return 0;
+	}
+}
+
