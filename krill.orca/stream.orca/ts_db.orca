@@ -5,8 +5,9 @@ using krill.handler;
 def first_db;
 def second_db;
 
-def first_limit := 5;
-def second_limit := 1000;
+# TODO: as config
+def first_limit := 1000;
+def second_limit := 100000;
 
 def init_db()
 {

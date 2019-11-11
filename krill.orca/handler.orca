@@ -24,8 +24,10 @@ def init_handler()
 	..command_table['TTL'] = (common.ttl, 2, 2);
 	..command_table['PTTL'] = (common.pttl, 2, 2);
 	..command_table['PERSIST'] = (common.persist, 2, 2);
-	..command_table['DUMP'] = (stream.dump, 1, 1);
-	..command_table['QUIT'] = (krill.quit, 1, 1);
+	..command_table['QUIT'] = (common.quit, 1, 1);
+	..command_table['PING'] = (common.ping, 1, 1);
+	#..command_table['SHUTDOWN'] = (krill.shutdown, 1, 1);
+	#..command_table['DUMP'] = (stream.dump, 1, 1);
 
 	# script
 	..command_table['SCRIPT'] = (script.script, 1, -1);

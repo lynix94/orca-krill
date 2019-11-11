@@ -144,7 +144,7 @@ def persist(key)
 
 def expire_thread()
 {
-	while krill.quit_flag == false {
+	while krill.shutdown_flag == false {
 		common.ttl_mutex {
 			ts_key = krill.ttl_ts_key;
 			key_ts = krill.ttl_key_ts;
@@ -181,6 +181,15 @@ def expire_thread()
 	}
 }
 
+def quit()
+{
+	return ('quit',);
+}
+
+def ping()
+{
+	return 'PONG';
+}
 
 
 

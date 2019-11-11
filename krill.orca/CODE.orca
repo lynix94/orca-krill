@@ -23,11 +23,11 @@ def ttl_ts_key := {,}; # ts_key map
 def ttl_key_ts := {,}; # key_ts map
 
 
-def quit_flag := false;
+def shutdown_flag := false;
 
-def quit()
+def shutdown()
 {
-	..quit_flag = true;
+	..shutdown_flag = true;
 	..krill.data = nil;
 	return nil;
 }
@@ -86,7 +86,7 @@ def server(port) {
 	sock.bind(port);
 	sock.listen();
 
-	while krill.quit_flag == false {
+	while krill.shutdown_flag == false {
 		s = sock.accept();
 		c = krill.client.clone(s);
 		#parallel my.process_request(c);
@@ -155,7 +155,7 @@ def server(port) {
 				#print('> ', result);
 				client.send(result);
 
-				if krill.quit_flag {
+				if krill.shutdown_flag || client.MEMBERS['quit'] == true  {
 					client.close();
 					break;
 				}
@@ -307,6 +307,10 @@ def server(port) {
 					krill.remove_block(key_list, client);
 				}
 			}
+
+		case 'quit':
+			client.MEMBERS['quit'] = true;
+			ret = 'OK';
 
 		default:
 			ret = handler.error('internal error: unknown command');
