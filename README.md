@@ -7,9 +7,11 @@ The orca programming language is the new oop language and you can see more infor
 https://github.com/lynix94/orca-lang
 
 
+
 The krill is made by pure orca so memory efficiency and speed are not goal of this project.
 
 But, The purposes of krill are belows especially No 4.
+
 
 
 ### 1. Krill can be mixed with orca.
@@ -73,6 +75,16 @@ Thanks for reading and you can see running example by below link.
 
 
 TBD
+
+
+### To run this
+
+First, clone this project and simply run by 'orca run.orca [PORT]'. default port is 6379.
+or you can run this by below docker image. 
+
+```
+docker run -d -p 6379:6379 lynix94/orca-krill:latest
+```
 
 
 

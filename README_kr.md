@@ -77,6 +77,15 @@ https://github.com/lynix94/orca-lang/blob/master/docs/rad_kr.md
 TBD
 
 
+### 실행하는 방법
+
+오르카가 설치되어 있다면, 이 프로젝트를 내려받고 'orca run.orca [PORT]' 로 실행할 수 있다. default port 는 6379 이다.
+
+또는 아래의 도커 이미지로 실행할 수 있다.
+
+```
+docker run -d -p 6379:6379 lynix94/orca-krill:latest
+```
 
 
 

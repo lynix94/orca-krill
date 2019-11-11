@@ -3,22 +3,19 @@ import redis
 
 r = redis.StrictRedis(host='127.0.0.1', port=6379)
 
-
-
 #
-# stream
+# ts
 #
-
 r.delete('stream')
-
-for i in range (1000):
-	print r.xadd('stream', {'a':0, 'b':1})
-
-while True:
-	print len(r.xrange('stream', ))
+r.delete('ts:stream')
 
 
-sys.exit(0)
+for i in range (100):
+	print r.xadd('ts:stream', {'a':i, 'b':i})
+
+print r.xlen('ts:stream')
+print r.xrange('ts:stream')
+
 
 
 
