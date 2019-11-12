@@ -74,7 +74,7 @@ https://github.com/lynix94/orca-lang/blob/master/docs/rad_kr.md
 
 그럼 읽어 주셔서 감사하고, 아래 링크에서 실 동작을 시연하는 모습을 볼수 있다.
 
-TBD
+https://youtu.be/OSjO0lQlCRk
 
 
 ### 실행하는 방법
