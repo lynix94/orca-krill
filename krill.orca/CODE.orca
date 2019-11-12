@@ -98,6 +98,10 @@ def server(port) {
 		while true {
 			try {
 				msg = client.recv();
+				if msg.strip() == '' {
+					continue;
+				}
+
 				if msg.starts_with('*') {
 					v = resp.decoding(msg);
 				}

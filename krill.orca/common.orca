@@ -185,6 +185,8 @@ def quit()
 {
 	ret =  {'quit':true};
 	ret.MEMBERS['RESP_TYPE'] = 'quit';
+
+	return ret;
 }
 
 def ping()
