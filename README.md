@@ -71,10 +71,7 @@ Now it provides version 1.x level of redis api except stream. But api will be ad
 
 Any kinds of contribution are welcome.
 
-Thanks for reading and you can see running example by below link.
-
-
-TBD
+Thanks for reading 
 
 
 ### To run this
