@@ -183,7 +183,8 @@ def expire_thread()
 
 def quit()
 {
-	return ('quit',);
+	ret =  {'quit':true};
+	ret.MEMBERS['RESP_TYPE'] = 'quit';
 }
 
 def ping()

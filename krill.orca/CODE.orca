@@ -139,14 +139,13 @@ def server(port) {
 
 					krill.data_mutex {
 						ret = cmd[0](v...);
-						if ret.TYPE == type.tuple && ret[0] == 'block' {
-							key_list = ret[1];
-							krill.add_block(key_list, client);
+						if ret.TYPE == type.map && ret.MEMBERS['RESP_TYPE'] == 'block' {
+							krill.add_block(ret['blocking_keys'], client);
 						}
 					}
 
 					# process block, join command without mutex
-					if ret.TYPE == type.tuple && ret[0] != '-' {
+					if ret.TYPE == type.map && ret.MEMBERS.has_key('RESP_TYPE') {
 						ret = ..process_post(client, ret);
 					}
 				}
@@ -187,14 +186,6 @@ def server(port) {
 
 			return ':0\r\n';
 
-		case type.tuple:
-			if msg[0] == '-' {
-				return '-' + msg[1] + '\r\n';
-			}
-			else {
-				return '-internal error\r\n';
-			}
-
 		case type.integer:
 			return ':%d\r\n' % msg;
 
@@ -210,8 +201,20 @@ def server(port) {
 		case type.list:
 			return resp.encoding(msg);
 
+		case type.tuple:
+			return resp.encoding(msg);
+
+		case type.map:
+			if msg.MEMBERS['RESP_TYPE'] == 'error' {
+				return '-%s\r\n' % msg['error'];
+			}
+			else {
+				return resp.encoding(msg);
+			}
+
 		case nil.TYPE:
 			return '$-1\r\n';
+
 		}
 
 		return '-unknown type\r\n';
@@ -284,14 +287,13 @@ def server(port) {
 
 	def process_post(client, ret)
 	{
-		switch ret[0]
+		switch ret.MEMBERS['RESP_TYPE']
 		{
 		case 'block': # try block again
-			# ( 'block', key_list, timeout, fptr, params )
-			key_list = ret[1];
-			timeout = ret[2];
-			fptr = ret[3];
-			params = ret[4];
+			key_list = ret['blocking_keys'];
+			timeout = ret['timeout'];
+			fptr = ret['command'];
+			params = ret['param'];
 
 			select
 			{
@@ -312,8 +314,11 @@ def server(port) {
 			client.MEMBERS['quit'] = true;
 			ret = 'OK';
 
+		case 'error':
+			break;
+
 		default:
-			ret = handler.error('internal error: unknown command');
+			ret = handler.error('internal error: unknown type');
 		}
 
 		return ret;

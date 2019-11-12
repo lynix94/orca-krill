@@ -95,7 +95,9 @@ def blpop(...key_list_timeout)
 		return [key, value];
 	}
 
-	return ('block', key_list, timeout, blpop, key_list_timeout);
+	ret = { 'blocking_keys':key_list, 'timeout':timeout, 'command':blpop, 'param':key_list_timeout};
+	ret.MEMBERS['RESP_TYPE'] = 'block';
+	return ret;
 }
 
 def brpop(...key_list_timeout)
@@ -118,7 +120,9 @@ def brpop(...key_list_timeout)
 		return [key, value];
 	}
 
-	return ('block', key_list, timeout, brpop, key_list_timeout);
+	ret = { 'blocking_keys':key_list, 'timeout':timeout, 'command':brpop, 'param':key_list_timeout};
+	ret.MEMBERS['RESP_TYPE'] = 'block';
+	return ret;
 }
 
 def llen(key)

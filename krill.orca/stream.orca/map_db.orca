@@ -175,7 +175,9 @@ def xread(key_id_map, count, block)
 	}
 
 	if result.size() == 0 && block != nil {
-		return ('block', key_ts_map.keys(), block, ..xread2, (key_ts_map, count));
+		ret = {'blocking_keys':key_ts_map.keys(), 'timeout':block, 'command':..xread2, 'param':(key_ts_map, count)};
+		ret.MEMBERS['RESP_TYPE'] = 'block';
+		return ret;
 	}
 
 	return result;

@@ -113,7 +113,10 @@ def init_handler()
 
 def error(msg)
 {
-	return ('-', msg);
+	ret = {'error': msg};
+	ret.MEMBERS['RESP_TYPE'] = 'error';
+
+	return ret;
 }
 
 
