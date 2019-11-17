@@ -14,7 +14,7 @@ https://github.com/lynix94/orca-lang
 
 ### 1. 오르카와 완전히, 자연스럽게 연동된다.
 
-오르카 언어로 동작하기 때문에, 안의 자료들을 오르카 네이티브 메소드로 억세스 할 수 있다.
+오르카 언어로 동작하기 때문에, 안의 자료들을 오르카 네이티브 로 억세스 할 수 있다.
 스크립트의 경우도 redis 의 lua 스크립트가 아니라 오르카 언어로 작성하며, 해당 스크립트는 krill 서버에서 별도의 쓰레드로 실행되며 데이터를 바로 억세스 할 수 있다.
 
 https://github.com/lynix94/orca-krill/blob/master/example/ex2_script_sum.py
@@ -49,14 +49,14 @@ client 가 lpush 로 ask list 에 message 를 보내면 채널로 시그널을 �
 
 ### 3. 그리고 krill 은 라이브러리로 인클루드 할 수 있다.
 
-오르카 프로그램을 작성하면서 krill 을 import 하고  별도 쓰레드로 띄우면 krill.data 를 통해 krill 이 저장하고 있는 k/v, hash, set, list, stream 을 바로 저장할 수 있다. 이 프로그램은 blocking pop 을 이용해 외부와 통신할 수도 있다.
+오르카 프로그램을 작성하면서 krill 을 import 하고  별도 쓰레드로 띄우면 krill.data 를 통해 krill 이 저장하고 있는 k/v, hash, set, list, stream 을 바로 접근할 수 있다. 이 프로그램은 blocking pop 을 이용해 외부와 통신할 수도 있다.
 
 
 ### 4. level db 를 사용한 time-series 저장소를 지원한다.
 
 krill 은 redis stream 을 지원하는데, 만일 stream 의 key 가 ts: 로 시작하면 별도 취급하여 오래된 데이터는 level db 로 이동시킨다. 때문에 메모리 제한없이 time-series 저장소로 사용할 수 있고, 별도의 스크립트나 프로그램에서 이 타임시리즈를 사용, 분석할 수 있다.
 
-krill 은 오르카가 grapana 와 같은 타임시리즈 모니터링, 분석 툴을 제작하기 위한 저장소로 사용하기 위해 시작되었다. 위 목적의 웹 프로그래밍이 직접, 혹은 원격의 데이터를 효율적으로 다루는 것이 목적이다. 
+krill 은 오르카가 grafana 와 같은 타임시리즈 모니터링, 분석 툴을 제작하기 위한 저장소로 사용하기 위해 시작되었다. 위 목적의 웹 프로그래밍이 직접, 혹은 원격의 데이터를 효율적으로 다루는 것이 목적이다. 
 오르카는 범용 프로그래밍이지만 일단 웹 프로그래밍에서 그 고유의 특장점을 보여줄 생각으로 아래의 10분가이드 및 RAD 모드와 같은 새로운 방식의 접근이 가능하다.
 
 https://github.com/lynix94/orca-lang/blob/master/docs/10min_kr.md
