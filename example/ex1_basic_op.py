@@ -128,7 +128,7 @@ print 'zset examples'
 
 r.delete('zset')
 for i in range(10):
-	print r.zadd('zset', {i:"subkey-%d" % i})
+	print r.zadd('zset', {"subkey-%d" % i:i})
 
 ret = r.zrange('zset', 0, -1)
 print len(ret)

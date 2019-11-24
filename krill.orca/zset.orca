@@ -22,8 +22,8 @@ def zadd(key, ...subkeys)
 	count = 0;
 	idx = 0;
 	while idx + 1 < subkeys.size() {
-		subkey = subkeys[idx];
-		score = subkeys[idx+1].integer();
+		score = subkeys[idx].float();
+		subkey = subkeys[idx+1];
 
 		data = krill.data[key];
 		if data == nil {

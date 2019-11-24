@@ -154,7 +154,7 @@ assert r.sismember('set2', 'set_0') == True
 
 r.delete('zset')
 for i in range(10):
-	assert r.zadd('zset', {i:"subkey-%d" % i}) == 1
+	assert r.zadd('zset', {"subkey-%d" % i:i}) == 1
 
 ret = r.zrange('zset', 0, -1)
 assert len(ret) == 10
