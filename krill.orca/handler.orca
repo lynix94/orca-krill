@@ -27,7 +27,7 @@ def init_handler()
 	..command_table['QUIT'] = (common.quit, 1, 1);
 	..command_table['PING'] = (common.ping, 1, 1);
 	#..command_table['SHUTDOWN'] = (krill.shutdown, 1, 1);
-	#..command_table['DUMP'] = (stream.dump, 1, 1);
+	..command_table['DUMP'] = (stream.dump, 1, 1);
 
 	# script
 	..command_table['SCRIPT'] = (script.script, 1, -1);

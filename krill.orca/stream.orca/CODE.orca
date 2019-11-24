@@ -62,9 +62,15 @@ def _entry_to_list(entry, fields)
 	kv_list = [];
 
 	if fields == nil {
-		for k, v in row {
-			kv_list.push_back(k);
-			kv_list.push_back(v);
+		if row.TYPE != type.map {
+			kv_list.push_back('value');
+			kv_list.push_back(row);
+		}
+		else {
+			for k, v in row {
+				kv_list.push_back(k);
+				kv_list.push_back(v);
+			}
 		}
 	}
 	else {
@@ -172,7 +178,7 @@ def __xrange(key, start, end, ...param)
 	count = 0;
 	fields = nil;
 
-	if param != nil {
+	if param.size() > 0 {
 		if param[0].lower() == 'count' {
 			count = param[1].integer();
 			if count <= 0 {
@@ -200,7 +206,7 @@ def __xrevrange(key, end, start, ...param)
 	count = 0;
 	fields = nil;
 
-	if param != nil {
+	if param.size() > 0 {
 		if param[0].lower() == 'count' {
 			count = param[1].integer();
 			if count <= 0 {

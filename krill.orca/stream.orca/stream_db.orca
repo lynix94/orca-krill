@@ -24,11 +24,10 @@ def xadd(key, id, row, maxlen, about)
 {
 	if key.starts_with('ts:') {
 		ret = ..ts_db.xadd(key, id, row, maxlen, about);
-
+		return ret;
 	}
 
 	ret = ..map_db.xadd(key, id, row, maxlen, about);
-
 	krill.signal_block(key);
 	return ret;
 }

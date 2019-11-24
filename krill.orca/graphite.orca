@@ -1,0 +1,97 @@
+#
+# graphite carbon plain text put interface
+# this server move data to ts:NAME of stream
+#
+
+using krill;
+using krill.graphite;
+using krill.handler;
+using krill.common;
+using krill.stream;
+using krill.script;
+
+using encoding.resp;
+using socket;
+using thread;
+using time;
+using queue;
+using ipc.mutex;
+using alg;
+using fun;
+
+
+
+
+
+def server(port) {
+	sock = socket.create();
+	sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1);
+	sock.bind(port);
+	sock.listen();
+
+	while krill.shutdown_flag == false {
+		c = sock.accept();
+		thread.run(my.process_request, c);
+	}
+
+	def process_request(client)
+	{
+		while true {
+			try {
+				buff = '';
+				buff += client.recv();
+
+				while buff.find('\n') > 0 {
+					idx = buff.find('\n');
+					line = buff[:idx];
+					buff = buff[idx+1:];
+			
+					if line.strip() == '' {
+						continue;
+					}
+
+					toks = line.strip().split(' ');
+					print: toks;
+
+					if toks.size() == 3 {
+						metric = 'ts:' + toks[0];
+						value = toks[1];
+						if value == 'nan' {
+							value = nil;
+						}
+						else {
+							value = value.float();
+						}
+						
+						ts = toks[2];
+					}
+
+					krill.data_mutex {
+						krill.stream.ts_db.xadd(metric, ts, value, 1000, true);
+					}
+				}
+
+				if krill.shutdown_flag {
+					client.close();
+					break;
+				}
+			}
+			catch io.socket.disconn {
+				print: 'client disconnected';
+				break;
+			}
+			catch any as e {
+				print: e.who();
+				print: e.what();
+				print: e.print_trace();
+				msg = e.what();
+			}
+		}
+	}
+}
+
+
+
+
+
+

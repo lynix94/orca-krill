@@ -78,6 +78,8 @@ def client
 	}
 }
 
+
+
 def server(port) {
 	..init_krill();
 
@@ -109,7 +111,7 @@ def server(port) {
 					v = msg.strip().split(' ');
 				}
 
-				#print: v;
+				print: v;
 
 				k = v[0].upper();
 				cmd = handler.command_table[k];
