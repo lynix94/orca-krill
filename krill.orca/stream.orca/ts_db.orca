@@ -6,7 +6,7 @@ def first_db;
 def second_db;
 
 # TODO: as config
-def first_limit := 1000;
+def first_limit := 10000;
 def second_limit := 100000;
 
 def init_db()
@@ -27,6 +27,14 @@ def dump()
 # ts_db ignore maxlen (handle it by first_limit, second_limit)
 def xadd(key, id, row, maxlen, about)
 {
+	if row.TYPE == type.map {
+		if row.size() != 1 {
+			return handler.error('ts db can not multi attribute');
+		}
+
+		row = row.first().value();
+	}
+
 	ret = ..first_db.xadd(key, id, row, maxlen, about);
 
 	if ..first_db.xlen(key) > ..first_limit * 2 {
@@ -43,28 +51,28 @@ def xlen(key)
 	return ..first_db.xlen(key) + ..second_db.xlen(key);
 }
 
-def xrange(key, start, end, count, fields)
+def xrange(key, start, end_ts, count, fields)
 {
 	start_ts = stream._id_to_ts(start);
 	if start_ts >= ..first_db.min(key) { # only 1st
-		return ..first_db.xrange(key, start, end, count, fields);
+		return ..first_db.xrange(key, start, end_ts, count, fields);
 	}
 
-	result_2 = ..second_db.xrange(key, start, end, count, fields);
-	result_1 = ..first_db.xrange(key, start, end, count, fields);
+	result_2 = ..second_db.xrange(key, start, end_ts, count, fields);
+	result_1 = ..first_db.xrange(key, start, end_ts, count, fields);
 
 	return result_2 + result_1;
 }
 
-def xrevrange(key, end, start, count, fields)
+def xrevrange(key, end_ts, start, count, fields)
 {
 	start_ts = stream._id_to_ts(start);
 	if start_ts >= ..first_db.min(key) { # only 1st
-		return ..first_db.xrevrange(key, end, start, count, fields);
+		return ..first_db.xrevrange(key, end_ts, start, count, fields);
 	}
 
-	result_2 = ..second_db.xrevrange(key, end, start, count, fields);
-	result_1 = ..first_db.xrevange(key, end, start, count, fields);
+	result_2 = ..second_db.xrevrange(key, end_ts, start, count, fields);
+	result_1 = ..first_db.xrevange(key, end_ts, start, count, fields);
 
 	return result_1 + result_2;
 }
@@ -84,6 +92,31 @@ def xtrim(key, count, about)
 {
 	return 0;
 }
+
+
+def tsadd(...param)
+{
+	return ..first_db.tsadd(param...);
+}
+
+
+def tsrange(start_ts, end_ts, ...key_list)
+{
+	result_1 = ..first_db.tsrange(start_ts, end_ts, key_list...);
+	return result_1;
+
+	result_2 = ..second_db.tsrange(start_ts, end_ts, key_list...);
+	result_1 = ..first_db.tsrange(start_ts, end_ts, key_list...);
+
+	return result_2 + result_1;
+}
+
+
+
+
+
+
+
 
 
 

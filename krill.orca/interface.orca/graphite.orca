@@ -23,7 +23,7 @@ using fun;
 
 
 
-def server(port) {
+def listen(port) {
 	sock = socket.create();
 	sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1);
 	sock.bind(port);

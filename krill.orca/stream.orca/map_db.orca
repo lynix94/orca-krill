@@ -2,6 +2,7 @@ using krill;
 using krill.stream;
 
 using queue;
+using strings;
 using time;
 
 def init_db()
@@ -52,7 +53,6 @@ def xlen(key)
 
 def xrange(key, start, end, count, fields)
 {
-print: 'xrange', key, start, end, count, fields;
 	data = krill.data[key];
 	ret = stream._stream_type_check(data);
 	if ret != true {
@@ -66,7 +66,6 @@ print: 'xrange', key, start, end, count, fields;
 	e_it = data.upper_bound(end_ts);
 
 	result = [];
-print: 'xrange: ', start_ts, end_ts;
 
 	while s_it != e_it {
 		result.push_back(stream._entry_to_list(s_it()));	
@@ -294,5 +293,67 @@ def move(key, count, dst_db)
 def dump()
 {
 	print: krill.data;
+}
+
+def tsrange(start_ts, end_ts, ...key_list)
+{
+	result = {,};
+	start_ts = start_ts.integer();
+	end_ts = end_ts.integer();
+
+	for idx, key in key_list {
+		data = krill.data[key];
+		ret = stream._stream_type_check(data);
+		if ret != true {
+			return ret;
+		}
+
+		s_it = data.lower_bound(start_ts);
+		e_it = data.upper_bound(end_ts);
+
+		while s_it != e_it {
+			item = result[s_it.key()];
+			if item == nil {
+				item = type.tuple();
+				for i in range(key_list.size()) {
+					item.push_back(nil);
+				}
+				result[s_it.key()] = item;
+			}
+
+			item[idx] = s_it.value();
+			if s_it == data.last() {
+				break;
+			}
+
+			s_it.next();
+		}
+	}
+
+	ret = '';
+	for k, v in result {
+		ret += '%f,%s\n' % (k, strings.join(',', v...));
+	}
+
+	return ret;
+}
+
+def tsadd(...param)
+{
+	idx = 0;
+	while idx + 2 < param.size() {
+		key = param[idx];
+		ts = param[idx+1].float();
+		value = param[idx+2].float();
+
+		ret = ..xadd(key, ts, value);
+		if ret.TYPE != type.str {
+			return ret;
+		}
+
+		idx += 3;
+	}
+
+	return 'OK';
 }
 

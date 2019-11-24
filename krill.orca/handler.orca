@@ -26,7 +26,7 @@ def init_handler()
 	..command_table['PERSIST'] = (common.persist, 2, 2);
 	..command_table['QUIT'] = (common.quit, 1, 1);
 	..command_table['PING'] = (common.ping, 1, 1);
-	#..command_table['SHUTDOWN'] = (krill.shutdown, 1, 1);
+	..command_table['SHUTDOWN'] = (krill.shutdown, 1, 1);
 	..command_table['DUMP'] = (stream.dump, 1, 1);
 
 	# script
@@ -108,6 +108,10 @@ def init_handler()
 	..command_table['XPENDING'] = (stream.xpending, 3, 3);
 	..command_table['XCLAIM'] = (stream.xclaim, 6, -1);
 	..command_table['XINFO'] = (stream.__xinfo, 3, 4);
+
+	# krill tsdb extended
+	..command_table['TSADD'] = (stream.ts_db.tsadd, 2, -1);
+	..command_table['TSRANGE'] = (stream.ts_db.tsrange, 4, -1);
 }
 
 

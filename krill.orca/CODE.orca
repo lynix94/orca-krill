@@ -28,7 +28,7 @@ def shutdown_flag := false;
 def shutdown()
 {
 	..shutdown_flag = true;
-	..krill.data = nil;
+	#krill.data = nil;
 	return nil;
 }
 

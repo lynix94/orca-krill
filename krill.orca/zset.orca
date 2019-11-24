@@ -22,6 +22,7 @@ def zadd(key, ...subkeys)
 	count = 0;
 	idx = 0;
 	while idx + 1 < subkeys.size() {
+		print: '??????????????? ', subkeys[idx];
 		score = subkeys[idx].float();
 		subkey = subkeys[idx+1];
 
