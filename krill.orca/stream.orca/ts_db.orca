@@ -6,6 +6,7 @@ def first_db;
 def second_db;
 
 # TODO: as config
+def block_size := 100;
 def first_limit := 10000;
 def second_limit := 100000;
 
@@ -36,10 +37,9 @@ def xadd(key, id, row, maxlen, about)
 	}
 
 	ret = ..first_db.xadd(key, id, row, maxlen, about);
-
-	if ..first_db.xlen(key) > ..first_limit * 2 {
-		print('### move called');
-		..first_db.move(key, ..first_limit, ..second_db);
+	if ..first_db.xlen(key) > ..block_size * 2 {
+		comp = ..first_db.compress(key, ..block_size);
+		#..first_db.move(key, ..first_limit, ..second_db);
 	}
 
 	return ret;
@@ -57,11 +57,9 @@ def xrange(key, start, end_ts, count, fields)
 	if start_ts >= ..first_db.min(key) { # only 1st
 		return ..first_db.xrange(key, start, end_ts, count, fields);
 	}
-
-	result_2 = ..second_db.xrange(key, start, end_ts, count, fields);
-	result_1 = ..first_db.xrange(key, start, end_ts, count, fields);
-
-	return result_2 + result_1;
+	else {
+		return  ..second_db.xrange(key, start, end_ts, count, fields);
+	}
 }
 
 def xrevrange(key, end_ts, start, count, fields)
@@ -96,20 +94,48 @@ def xtrim(key, count, about)
 
 def tsadd(...param)
 {
-	return ..first_db.tsadd(param...);
+	idx = 0;
+	while idx + 2 < param.size() {
+		key = param[idx];
+		ts = param[idx+1].float();
+		value = param[idx+2].float();
+
+		ret = ..xadd(key, ts, value);
+		if ret.TYPE != type.str {
+			return ret;
+		}
+
+		idx += 3;
+	}
+
+	return 'OK';
 }
 
 
 def tsrange(start_ts, end_ts, ...key_list)
 {
-	result_1 = ..first_db.tsrange(start_ts, end_ts, key_list...);
-	return result_1;
+	flag_old = false;
+	for key in key_list {
+		if ..first_db.min(key) < start_ts {
+			flag_old = true;
+			break;
+		}
+	}
 
-	result_2 = ..second_db.tsrange(start_ts, end_ts, key_list...);
-	result_1 = ..first_db.tsrange(start_ts, end_ts, key_list...);
-
-	return result_2 + result_1;
+	if flag_old {
+		return ..second_db.tsrange(start_ts, end_ts, key_list...);
+	}
+	else {
+		return ..first_db.tsrange(start_ts, end_ts, key_list...);
+	}
 }
+
+
+def tsstat(key)
+{
+	return ..first_db.tsstat(key);
+}
+
 
 
 

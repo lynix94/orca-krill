@@ -10,10 +10,11 @@ else {
 
 print: 'start krill server on port %d' % port;
 
-krill.server(port);
+#krill.server(port);
 
 parallel krill.server(port);
-time.sleep(1);
+time.sleep(0.3);
 krill.interface.graphite.listen(2003);
+#krill.interface.graphite.listen(3003);
 
 

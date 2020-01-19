@@ -1,7 +1,10 @@
 
 using krill;
+using krill.handler;
 using krill.stream;
 using storage.leveldb;
+
+using strings;
 
 def handle;
 
@@ -12,17 +15,24 @@ def init_db()
 
 def xadd(key, id, row, maxlen, about)
 {
-	db_key = '%s_%.6f' % (key, stream._id_to_ts(id));
-	db_row = '';
-	for k, v in row {
-		if v.TYPE == type.string {
-			v.replace(',', '.');
+	db_key = '%s_%010.06f' % (key, stream._id_to_ts(id));
+
+	if row.TYPE == type.map {
+		db_row = '';
+		for k, v in row {
+			if v.TYPE == type.string {
+				v.replace(',', '.');
+			}
+		
+			db_row += '%s:%s,' % (k, v);
 		}
-	
-		db_row += '%s:%s,' % (k, v);
+
+		..handle.put(db_key, db_row);
+	}
+	else {
+		..handle.put(db_key, string(row));
 	}
 
-	..handle.put(db_key, db_row);
 	return id;
 }
 
@@ -33,10 +43,10 @@ def xlen(key)
 
 def xrange(key, start, end, count, fields)
 {
-	start_key = '%s_%.6f' % (key, stream._id_to_ts(start));
+	start_key = '%s_%010.06f' % (key, stream._id_to_ts(start));
 	s_it = ..handle.lower_bound(start_key);
 
-	end_key = '%s_%.6f' % (key, stream._id_to_ts(end));
+	end_key = '%s_%010.06f' % (key, stream._id_to_ts(end));
 	e_it = ..handle.upper_bound(end_key);
 
 	result = [];
@@ -70,10 +80,10 @@ def xrange(key, start, end, count, fields)
 
 def xrevrange(key, end, start, count, fields)
 {
-	start_key = '%s_%.6f' % (key, stream._id_to_ts(start));
+	start_key = '%s_%010.06f' % (key, stream._id_to_ts(start));
 	s_it = ..handle.lower_bound(start_key);
 
-	end_key = '%s_%.6f' % (key, stream._id_to_ts(end));
+	end_key = '%s_%010.06f' % (key, stream._id_to_ts(end));
 	e_it = ..handle.upper_bound(end_key);
 
 	result = [];
@@ -109,7 +119,7 @@ def xdel(key, ...id_list)
 {
 	count = 0;
 	for id in id_list {
-		db_key = '%s_%.6f' % (key, stream._id_to_ts(id));
+		db_key = '%s_%010.06f' % (key, stream._id_to_ts(id));
 		if ..handle.find(db_key) == ..handle.end() {
 			continue;
 		}
@@ -150,5 +160,50 @@ def dump()
 	for k, v in ..handle {
 		print: '  %s - %s' % (k, v);
 	}
+}
+
+def tsrange(start_ts, end_ts, ...key_list)
+{
+	result = {,};
+	start_ts = start_ts.float();
+	end_ts = end_ts.float();
+
+	for idx, key in key_list {
+		if !key.starts_with('ts:') {
+			return handler.error('tsrange need ts: prefix');
+		}
+
+		start_key = '%s_%010.06f' % (key, start_ts);
+		s_it = ..handle.lower_bound(start_key);
+		end_key = '%s_%010.06f' % (key, end_ts);
+		e_it = ..handle.upper_bound(end_key);
+
+		while s_it != e_it {
+			timestamp = s_it.key().split('_')[1].float();
+print: '>>> ', timestamp;
+			item = result[timestamp];
+			if item == nil {
+				item = type.tuple();
+				for i in range(key_list.size()) {
+					item.push_back(nil);
+				}
+				result[timestamp] = item;
+			}
+
+			item[idx] = s_it.value().float();
+			if s_it == ..handle.last() {
+				break;
+			}
+
+			s_it.next();
+		}
+	}
+
+	ret = '';
+	for k, v in result {
+		ret += '%f,%s\n' % (k, strings.join(',', v...));
+	}
+
+	return ret;
 }
 

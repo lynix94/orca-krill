@@ -112,6 +112,7 @@ def init_handler()
 	# krill tsdb extended
 	..command_table['TSADD'] = (stream.ts_db.tsadd, 2, -1);
 	..command_table['TSRANGE'] = (stream.ts_db.tsrange, 4, -1);
+	..command_table['TSSTAT'] = (stream.ts_db.tsstat, 1, 2);
 }
 
 

@@ -1,0 +1,27 @@
+
+using socket;
+using math.random;
+
+
+s = socket.create();
+s.connect('127.0.0.1', 3003);
+
+format = '''collectd.cpu-0.cpu-user %f %d
+cllectd.memory.memory-used %d %d
+''';
+
+for i in range(100000000) {
+	cpu = 2 + random.real();
+	mem = 1000000000 + random.integer(1000000);
+	timestamp = 1579180489 + i;
+	s.send(format % (cpu, timestamp, mem, timestamp));
+
+	if i % 10000 == 0 {
+		print: i;
+	}
+}
+
+
+
+
+print: 'done';

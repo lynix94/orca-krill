@@ -1,9 +1,19 @@
 using krill;
+using krill.handler;
 using krill.stream;
+using krill.stream.map_db;
 
-using queue;
 using strings;
 using time;
+
+using compress.tsdiff;
+
+
+def ts_precision := 0;
+def value_precision := 6;
+def comp_block_len := 10;
+
+def compressed := {,};
 
 def init_db()
 {
@@ -60,12 +70,18 @@ def xrange(key, start, end, count, fields)
 	}
 
 	start_ts = stream._id_to_ts(start);
-	s_it = data.lower_bound(start_ts);
-
 	end_ts = stream._id_to_ts(end);
-	e_it = data.upper_bound(end_ts);
 
 	result = [];
+	if key.starts_with('ts:') && start_ts < data.first().key() { # only in ts
+		comp_result = map_db.scan_comp_block(key, start_ts, end_ts);
+		for item in comp_result {
+			result.push_back(stream._entry_to_list(item));	
+		}
+	}
+
+	s_it = data.lower_bound(start_ts);
+	e_it = data.upper_bound(end_ts);
 
 	while s_it != e_it {
 		result.push_back(stream._entry_to_list(s_it()));	
@@ -250,6 +266,11 @@ def xtrim(key, count, about)
 
 def min(key)
 {
+	comp_list = map_db.data[key];
+	if comp_list != nil && comp_list.size() > 0{
+		return comp_list[0].start_ts;
+	}
+
 	data = krill.data[key];
 	if data == nil {
 		return 0.0;
@@ -267,7 +288,75 @@ def min(key)
 	return data.first().key();
 }
 
-def move(key, count, dst_db)
+def dump()
+{
+	print: krill.data;
+}
+
+
+
+##
+## extensions..
+####
+
+
+def comp_block
+{
+	def ts;
+	def start_ts;
+	def end_ts;
+	def count;
+}
+
+def compress(key, count)
+{
+	#print: '## compress';
+	if !key.starts_with('ts:') {
+		return;
+	}
+
+	data = krill.data[key];
+	ret = stream._stream_type_check(data);
+	if ret != true {
+		return false;
+	}
+
+	if count < 3 {
+		return '';
+	}
+
+	#print: '## size: %d' % data.size();
+
+	cb = map_db.comp_block.clone();
+	cb.ts = tsdiff.clone(map_db.ts_precision, map_db.value_precision);
+	cb.start_ts = data.first().key();
+	cb.count = 0;
+
+	for i in range(count-1) {
+		k = data.first().key();
+		v = data.first().value();
+		data.first().erase();
+		cb.ts.push_back(k.integer(), '%.6f' % v);
+		cb.count += 1;
+	}
+	cb.end_ts = data.first().key();
+	
+	comp_list = map_db.compressed[key];
+	if comp_list == nil {
+		comp_list = [];
+		map_db.compressed[key] = comp_list;
+	}
+
+	comp_list.push_back(cb);
+	if comp_list.size() > map_db.comp_block_len {
+		comp_list.pop_front();
+	}
+
+	return count;
+}
+
+
+def copy(key, count, dst_db)
 {
 	data = krill.data[key];
 	ret = stream._stream_type_check(data);
@@ -290,22 +379,84 @@ def move(key, count, dst_db)
 	return count;
 }
 
-def dump()
+def tsadd(...param)
 {
-	print: krill.data;
+	idx = 0;
+	while idx + 2 < param.size() {
+		key = param[idx];
+		ts = param[idx+1].float();
+		value = param[idx+2].float();
+
+		if !key.starts_with('ts:') {
+			return handler.error('tsadd need ts: prefix');
+		}
+
+		ret = ..xadd(key, ts, value);
+		if ret.TYPE != type.str {
+			return ret;
+		}
+
+		idx += 3;
+	}
+
+	return 'OK';
+}
+
+
+def scan_comp_block(key, start_ts, end_ts)
+{
+	comp_list = map_db.compressed[key];
+	if comp_list == nil {
+		return nil;
+	}
+
+	result = [];
+	for cb in comp_list {
+		if cb.end_ts < start_ts {
+			continue;
+		} 
+
+		if cb.start_ts > end_ts {
+			break;
+		}
+
+		result += cb.ts.uncompress(end_ts); # [(ts,v),(ts,v)....]
+	}
+
+	return result;
 }
 
 def tsrange(start_ts, end_ts, ...key_list)
 {
 	result = {,};
-	start_ts = start_ts.integer();
-	end_ts = end_ts.integer();
+	start_ts = start_ts.float();
+	end_ts = end_ts.float();
 
 	for idx, key in key_list {
+		if !key.starts_with('ts:') {
+			return handler.error('tsrange need ts: prefix');
+		}
+
 		data = krill.data[key];
 		ret = stream._stream_type_check(data);
 		if ret != true {
 			return ret;
+		}
+
+		if start_ts < data.first().key() {
+			comp_result = map_db.scan_comp_block(key, start_ts, end_ts);
+			for c in comp_result {
+				item = result[c[0]];
+				if item == nil {
+					item = type.tuple();
+					for i in range(key_list.size()) {
+						item.push_back(nil);
+					}
+					result[c[0]] = item;
+				}
+		
+				item[idx] = c[1];
+			}
 		}
 
 		s_it = data.lower_bound(start_ts);
@@ -338,22 +489,103 @@ def tsrange(start_ts, end_ts, ...key_list)
 	return ret;
 }
 
-def tsadd(...param)
+def tsstat_key(key)
 {
-	idx = 0;
-	while idx + 2 < param.size() {
-		key = param[idx];
-		ts = param[idx+1].float();
-		value = param[idx+2].float();
-
-		ret = ..xadd(key, ts, value);
-		if ret.TYPE != type.str {
-			return ret;
-		}
-
-		idx += 3;
+	if !key.starts_with('ts:') {
+		return nil;
 	}
 
-	return 'OK';
+	data = krill.data[key];
+	ret = stream._stream_type_check(data);
+	if ret != true {
+		return ret;
+	}
+
+	comp_list = map_db.compressed[key];
+	if comp_list == nil {
+		comp_list = [];
+	}
+
+	comp_size = 0;
+	comp_count = 0;
+	comp_block_n = 0;
+	for cb in comp_list {
+		comp_count += cb.ts.count();
+		comp_size += cb.ts.size();
+		comp_block_n += 1;
+	}
+
+	comp_ratio = 100;
+	if comp_count > 0 {
+		comp_ratio = comp_size.float() / (comp_count * 64 * 2) * 100.0;
+	}
+
+	return [data.size(), comp_count, comp_size, comp_block_n, comp_ratio];
 }
+
+def tsstat_all()
+{
+	item_count = 0;
+	comp_size = 0;
+	comp_count = 0;
+	comp_block_n = 0;
+
+	s_it = krill.data.lower_bound('ts:');
+	while true {
+		if s_it == krill.data.end() {
+			break;
+		}
+
+		if !s_it.key().starts_with('ts:') {
+			break;
+		}
+
+		result = ..tsstat_key(s_it.key());
+		item_count += result[0];
+		comp_count += result[1];
+		comp_size += result[2];
+		comp_block_n += result[3];
+
+		if s_it == krill.data.last() {
+			break;
+		}
+
+		s_it.next();
+	}
+	
+	comp_ratio = 100;
+	if comp_count > 0 {
+		comp_ratio = comp_size.float() / (comp_count * 64 * 2) * 100.0;
+	}
+	
+
+	return [item_count, comp_count, comp_size, comp_block_n, comp_ratio];
+}
+
+
+def tsstat(key)
+{
+	if key == nil {
+		stat = ..tsstat_all();
+	}
+	else {
+		if !key.starts_with('ts:') {
+			return handler.error('tsstat need ts: prefix');
+		}
+
+		stat = ..tsstat_key(key);
+	}
+
+	result = '''items in memory map: %d
+items in compressed list: %d
+compressed size(bit): %d
+compressed size(Byte): %d
+compressed block: %d
+compressed ratio: %f
+''' % (stat[0], stat[1], stat[2], stat[2]/8, stat[3], stat[4]);
+
+	return result;
+}
+
+
 

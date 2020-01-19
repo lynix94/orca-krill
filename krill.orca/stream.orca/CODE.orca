@@ -96,6 +96,9 @@ def _id_to_ts(id)
 	if id.TYPE == type.float {
 		return id;
 	}
+	if id.TYPE == type.int {
+		return id.float();
+	}
 
 	if id == '-' {
 		return 0.float();
