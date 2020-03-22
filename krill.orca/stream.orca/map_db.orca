@@ -5,13 +5,14 @@ using krill.stream.map_db;
 
 using strings;
 using time;
+using datetime;
 
 using compress.tsdiff;
 
 
 def ts_precision := 0;
-def value_precision := 6;
-def comp_block_len := 10;
+def value_precision := 3;
+def comp_block_len := 1000;
 
 def compressed := {,};
 
@@ -348,7 +349,7 @@ def compress(key, count)
 	}
 
 	comp_list.push_back(cb);
-	if comp_list.size() > map_db.comp_block_len {
+	while comp_list.size() > map_db.comp_block_len {
 		comp_list.pop_front();
 	}
 
@@ -428,9 +429,27 @@ def scan_comp_block(key, start_ts, end_ts)
 
 def tsrange(start_ts, end_ts, ...key_list)
 {
+	if start_ts == nil || start_ts == '-' {
+		start_ts = 0;
+	}
+	elif start_ts.TYPE == type.string && (start_ts.find('-') > 0 || start_ts.find('T') > 0) {
+		start_ts = datetime.clone(start_ts).timestamp();
+	}
+	else {
+		start_ts = start_ts.float();
+	}
+
+	if end_ts == nil || end_ts == '+' {
+		end_ts = type.limits.int32_max;
+	}
+	elif end_ts.TYPE == type.string && (end_ts.find(':') > 0 || end_ts.find('T') > 0) {
+		end_ts = datetime.clone(end_ts).timestamp();
+	}
+	else {
+		end_ts = end_ts.float();
+	}
+
 	result = {,};
-	start_ts = start_ts.float();
-	end_ts = end_ts.float();
 
 	for idx, key in key_list {
 		if !key.starts_with('ts:') {
@@ -654,5 +673,95 @@ def tslist(key)
 	return list;
 }
 
+
+def tssave(name)
+{
+	if name == nil {
+		name = 'tsdump.dat';
+	}
+
+	fh = io.open(name, 'w');
+
+	tslist = ..tslist();
+	fh.write(strings.join(',', tslist...));
+	fh.write('\n');
+
+	result = ..tsrange(nil, nil, tslist...);
+	fh.write(result);
+
+	fh.close();
+	return true;
+}
+
+
+def tsload(name)
+{
+	if name == nil {
+		name = 'tsdump.dat';
+	}
+
+	fh = io.open(name, 'r');
+
+	keys = fh.read_line().strip().split(',');
+
+	while true {
+		try {
+			line = fh.read_line().strip();
+			if line == '' {
+				continue;
+			}
+
+			toks = line.split(',');
+			for i, key in keys {
+				if toks[i+1] == 'nil' {
+					continue;
+				}
+
+				..tsadd(key, toks[0], toks[i+1]);
+			}
+
+		}
+		catch orca.file.eof {
+			break;
+		}
+	}
+
+	fh.close();
+	return true;
+}
+
+
+
+def tsconfig(key, value)
+{
+	switch key
+	{
+	case 'ts_precision':
+		if value == nil {
+			map_db.ts_precision = value.integer(map_db.ts_precesion);
+		}
+
+		return map_db.ts_precision;
+
+	case 'value_precision':
+		if value != nil {
+			map_db.value_precision = value.integer(map_db.value_precision);
+		}
+
+		return map_db.value_precision;
+
+	case 'comp_block_len':
+		if value == nil {
+			map_db.comp_block_len = value.integer(map_db.comp_block_len);
+		}
+
+		return map_db.comp_block_len;
+
+	default:
+		return handler.error('invalid key');
+	}
+
+	return true;
+}
 
 

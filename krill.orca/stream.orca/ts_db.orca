@@ -2,13 +2,13 @@ using krill;
 using krill.stream;
 using krill.handler;
 
+using datetime;
+
 def first_db;
 def second_db;
 
 # TODO: as config
-def block_size := 100;
-def first_limit := 10000;
-def second_limit := 100000;
+def block_size := 200;
 
 def init_db()
 {
@@ -25,7 +25,7 @@ def dump()
 	..second_db.dump();
 }
 
-# ts_db ignore maxlen (handle it by first_limit, second_limit)
+# ts_db ignore maxlen (handle it by config)
 def xadd(key, id, row, maxlen, about)
 {
 	if row.TYPE == type.map {
@@ -39,7 +39,6 @@ def xadd(key, id, row, maxlen, about)
 	ret = ..first_db.xadd(key, id, row, maxlen, about);
 	if ..first_db.xlen(key) > ..block_size * 2 {
 		comp = ..first_db.compress(key, ..block_size);
-		#..first_db.move(key, ..first_limit, ..second_db);
 	}
 
 	return ret;
@@ -85,7 +84,7 @@ def xread(key, id, count, block)
 	return ..first_db.xread(key, id, count, block);
 }
 
-# ts_db ignore maxlen (handle it by first_limit, second_limit)
+# ts_db ignore maxlen (handle it by config)
 def xtrim(key, count, about)
 {
 	return 0;
@@ -114,8 +113,26 @@ def tsadd(...param)
 
 def tsrange(start_ts, end_ts, ...key_list)
 {
-	start_ts = start_ts.float();
-	end_ts = end_ts.float();
+	if start_ts == nil || start_ts == '-' {
+		start_ts = 0;
+	}
+	elif start_ts.TYPE == type.string && (start_ts.find('-') > 0 || start_ts.find('T') > 0) {
+		start_ts = datetime.clone(start_ts).timestamp();
+	}
+	else {
+		start_ts = start_ts.float();
+	}
+
+	if end_ts == nil || end_ts == '+' {
+		end_ts = type.limits.int32_max;
+	}
+	elif end_ts.TYPE == type.string && (end_ts.find(':') > 0 || end_ts.find('T') > 0) {
+		end_ts = datetime.clone(end_ts).timestamp();
+	}
+	else {
+		end_ts = end_ts.float();
+	}
+
 
 	flag_old = false;
 	for key in key_list {
@@ -145,6 +162,21 @@ def tsstat(key)
 def tslist(p)
 {
 	return ..first_db.tslist(p);
+}
+
+def tssave(name)
+{
+	return ..first_db.tssave(name);
+}
+
+def tsload(name)
+{
+	return ..first_db.tsload(name);
+}
+
+def tsconfig(key, value)
+{
+	return ..first_db.tsconfig(key, value);
 }
 
 

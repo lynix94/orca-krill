@@ -116,6 +116,9 @@ def init_handler()
 	..command_table['TSRANGE'] = (stream.ts_db.tsrange, 3, -1);
 	..command_table['TSSTAT'] = (stream.ts_db.tsstat, 0, 1);
 	..command_table['TSLIST'] = (stream.ts_db.tslist, 0, 1);
+	..command_table['TSSAVE'] = (stream.ts_db.tssave, 0, 1);
+	..command_table['TSLOAD'] = (stream.ts_db.tsload, 0, 1);
+	..command_table['TSCONFIG'] = (stream.ts_db.tsconfig, 1, 2);
 }
 
 
