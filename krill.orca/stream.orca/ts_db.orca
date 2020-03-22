@@ -114,13 +114,19 @@ def tsadd(...param)
 
 def tsrange(start_ts, end_ts, ...key_list)
 {
+	start_ts = start_ts.float();
+	end_ts = end_ts.float();
+
 	flag_old = false;
 	for key in key_list {
-		if ..first_db.min(key) < start_ts {
+		if start_ts < ..first_db.min(key) {
 			flag_old = true;
 			break;
 		}
 	}
+
+	# TODO: enable later
+	flag_old = false;
 
 	if flag_old {
 		return ..second_db.tsrange(start_ts, end_ts, key_list...);
@@ -134,6 +140,11 @@ def tsrange(start_ts, end_ts, ...key_list)
 def tsstat(key)
 {
 	return ..first_db.tsstat(key);
+}
+
+def tslist(p)
+{
+	return ..first_db.tslist(p);
 }
 
 

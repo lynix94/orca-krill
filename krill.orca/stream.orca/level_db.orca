@@ -180,7 +180,6 @@ def tsrange(start_ts, end_ts, ...key_list)
 
 		while s_it != e_it {
 			timestamp = s_it.key().split('_')[1].float();
-print: '>>> ', timestamp;
 			item = result[timestamp];
 			if item == nil {
 				item = type.tuple();

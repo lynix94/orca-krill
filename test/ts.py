@@ -29,12 +29,17 @@ s.connect(('127.0.0.1', 6379))
 s.sendall('tsrange 0 1000000 ts:cpu.user ts:cpu.sys ts:cpu.idle\r\n')
 time.sleep(0.1);
 ret = s.recv(4096);
-print ret;
+print '<<< "%s"' % ret;
+
 
 
 r.delete('ts:cpu.user')
 r.delete('ts:cpu.sys')
 r.delete('ts:cpu.idle')
+
+
+
+print 'tsadd, tsrange test'
 
 buff = ''
 for i in range (200):
@@ -44,14 +49,19 @@ for i in range (200):
 
 s.sendall('tsadd %s\r\n' % buff)
 ret = s.recv(4096);
-print ret;
+print '<<< "%s"' % ret;
 
 
 s.sendall('tsrange 0 1000000 ts:cpu.user ts:cpu.sys ts:cpu.idle\r\n')
-time.sleep(0.1);
-ret = s.recv(4096);
+time.sleep(0.5);
+ret = s.recv(4096*10);
 print ret;
 
+
+s.sendall('tslist\r\n')
+time.sleep(0.5);
+ret = s.recv(4096);
+print ret;
 
 
 

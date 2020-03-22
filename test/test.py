@@ -293,7 +293,7 @@ r.delete('ts:stream')
 
 
 for i in range (20):
-	print r.xadd('ts:stream', {'a':i, 'b':i})
+	print r.xadd('ts:stream', {'a':i}, id = '%d'%i)
 
 print r.xlen('ts:stream')
 print r.xrange('ts:stream')

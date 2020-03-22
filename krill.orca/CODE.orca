@@ -62,12 +62,12 @@ def client
 		..sock = sock;
 	}
 
-	def recv()
+	def read(n, timeout)
 	{
-		return ..sock.recv();
+		return ..sock.read(n, timeout);
 	}
 
-	def send(msg)
+	def write(msg)
 	{
 		return ..sock.send(msg);
 	}
@@ -97,36 +97,34 @@ def server(port) {
 
 	def process_request(client)
 	{
+		buffer = io.buffer.clone(client);
+	
 		while true {
 			try {
-				msg = client.recv();
-				if msg.strip() == '' {
+				v = buffer.read_resp(nil, true);
+				if v == '' {
 					continue;
 				}
 
-				if msg.starts_with('*') {
-					v = resp.decoding(msg);
+				if v.TYPE == type.string {
+					v = v.strip().split(' ');
 				}
-				else {
-					v = msg.strip().split(' ');
-				}
-
 				print: v;
 
 				k = v[0].upper();
 				cmd = handler.command_table[k];
 				if cmd == nil {
-					client.send('-not implemented yet\r\n');
+					client.write('-not implemented yet\r\n');
 					continue;
 				}
 
 				if v.size()  < cmd[1]+1 {
-					client.send('-insuffienct param\r\n');
+					client.write('-insuffienct param\r\n');
 					continue;
 				}
 
 				if cmd[2] >= 0 && v.size()  > cmd[2]+1 {
-					client.send('-too many param\r\n');
+					client.write('-too many param\r\n');
 					continue;
 				}
 
@@ -156,9 +154,9 @@ def server(port) {
 					}
 				}
 
-				result = ..make_response(ret);
+				result = resp.encoding(ret);
 				#print('> ', result);
-				client.send(result);
+				client.write(result);
 
 				if krill.shutdown_flag || client.MEMBERS['quit'] == true  {
 					client.close();
@@ -176,55 +174,11 @@ def server(port) {
 				msg = e.what();
 				msg = msg.replace('\n', '\\n');
 				msg = msg.replace('\r', '\\r');
-				client.send('-%s\r\n' % msg);
+				client.write('-%s\r\n' % msg);
 			}
 		}
 	}
 
-	def make_response(msg)
-	{
-		switch msg.TYPE
-		{
-		case type.bool:
-			if msg == true {
-				return ':1\r\n';
-			}
-
-			return ':0\r\n';
-
-		case type.integer:
-			return ':%d\r\n' % msg;
-
-		case type.string:
-			l = msg.length();
-			if l < 10 {
-				return '+' + msg + '\r\n';
-			}
-			else {
-				return '$%d\r\n%s\r\n' % (msg.length(), msg);
-			}
-
-		case type.list:
-			return resp.encoding(msg);
-
-		case type.tuple:
-			return resp.encoding(msg);
-
-		case type.map:
-			if msg.MEMBERS['RESP_TYPE'] == 'error' {
-				return '-%s\r\n' % msg['error'];
-			}
-			else {
-				return resp.encoding(msg);
-			}
-
-		case nil.TYPE:
-			return '$-1\r\n';
-
-		}
-
-		return '-unknown type\r\n';
-	}
 
 	def krill_handler(v)
 	{
@@ -319,9 +273,6 @@ def server(port) {
 		case 'quit':
 			client.MEMBERS['quit'] = true;
 			ret = 'OK';
-
-		case 'error':
-			break;
 
 		default:
 			ret = handler.error('internal error: unknown type');

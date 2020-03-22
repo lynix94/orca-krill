@@ -8,6 +8,8 @@ using krill.list;
 using krill.stream;
 using krill.script;
 
+using encoding.resp;
+
 def command_table := {,};
 
 
@@ -113,15 +115,13 @@ def init_handler()
 	..command_table['TSADD'] = (stream.ts_db.tsadd, 1, -1);
 	..command_table['TSRANGE'] = (stream.ts_db.tsrange, 3, -1);
 	..command_table['TSSTAT'] = (stream.ts_db.tsstat, 0, 1);
+	..command_table['TSLIST'] = (stream.ts_db.tslist, 0, 1);
 }
 
 
 def error(msg)
 {
-	ret = {'error': msg};
-	ret.MEMBERS['RESP_TYPE'] = 'error';
-
-	return ret;
+	return resp.error(msg);
 }
 
 

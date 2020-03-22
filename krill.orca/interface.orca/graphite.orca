@@ -10,7 +10,6 @@ using krill.common;
 using krill.stream;
 using krill.script;
 
-using encoding.resp;
 using socket;
 using thread;
 using time;

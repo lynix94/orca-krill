@@ -445,17 +445,19 @@ def tsrange(start_ts, end_ts, ...key_list)
 
 		if start_ts < data.first().key() {
 			comp_result = map_db.scan_comp_block(key, start_ts, end_ts);
-			for c in comp_result {
-				item = result[c[0]];
-				if item == nil {
-					item = type.tuple();
-					for i in range(key_list.size()) {
-						item.push_back(nil);
+			if comp_result != nil {
+				for c in comp_result {
+					item = result[c[0]];
+					if item == nil {
+						item = type.tuple();
+						for i in range(key_list.size()) {
+							item.push_back(nil);
+						}
+						result[c[0]] = item;
 					}
-					result[c[0]] = item;
+			
+					item[idx] = c[1];
 				}
-		
-				item[idx] = c[1];
 			}
 		}
 
@@ -585,6 +587,71 @@ compressed ratio: %f
 ''' % (stat[0], stat[1], stat[2], stat[2]/8, stat[3], stat[4]);
 
 	return result;
+}
+
+
+
+def tslist_key(key)
+{
+	re_key = type.regex(key);
+
+	result = [];
+	it = krill.data.lower_bound('ts:');
+	while true {
+		if it == krill.data.end() {
+			break;
+		}
+		if !it.key().starts_with('ts:') {
+			break;
+		}
+
+		if re_key == it.key() {
+			result.push_back(it.key());
+		}
+
+		if it == krill.data.last() {
+			break;
+		}
+		it.next();
+	}
+
+	return result;
+}
+
+def tslist_all()
+{
+	result = [];
+	s_it = krill.data.lower_bound('ts:');
+	while true {
+		if s_it == krill.data.end() {
+			break;
+		}
+		if !s_it.key().starts_with('ts:') {
+			break;
+		}
+
+		result.push_back(s_it.key());
+
+		if s_it == krill.data.last() {
+			break;
+		}
+		s_it.next();
+	}
+
+	return result;
+}
+
+
+def tslist(key)
+{
+	if key == nil {
+		list = ..tslist_all();
+	}
+	else {
+		list = ..tslist_key(key);
+	}
+
+	return list;
 }
 
 
