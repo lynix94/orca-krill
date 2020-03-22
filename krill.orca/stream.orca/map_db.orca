@@ -266,7 +266,7 @@ def xtrim(key, count, about)
 
 def min(key)
 {
-	comp_list = map_db.data[key];
+	comp_list = map_db.compressed[key];
 	if comp_list != nil && comp_list.size() > 0{
 		return comp_list[0].start_ts;
 	}

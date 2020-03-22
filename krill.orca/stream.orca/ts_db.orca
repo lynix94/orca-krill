@@ -30,7 +30,7 @@ def xadd(key, id, row, maxlen, about)
 {
 	if row.TYPE == type.map {
 		if row.size() != 1 {
-			return handler.error('ts db can not multi attribute');
+			return handler.error('ts db can not have multi attribute');
 		}
 
 		row = row.first().value();

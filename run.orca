@@ -10,7 +10,7 @@ else {
 
 print: 'start krill server on port %d' % port;
 
-#krill.server(port);
+krill.server(port);
 
 parallel krill.server(port);
 time.sleep(0.3);

@@ -120,12 +120,12 @@ def server(port) {
 					continue;
 				}
 
-				if v.size()  < cmd[1] {
+				if v.size()  < cmd[1]+1 {
 					client.send('-insuffienct param\r\n');
 					continue;
 				}
 
-				if cmd[2] >= 0 && v.size()  > cmd[2] {
+				if cmd[2] >= 0 && v.size()  > cmd[2]+1 {
 					client.send('-too many param\r\n');
 					continue;
 				}

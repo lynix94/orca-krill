@@ -15,104 +15,104 @@ def init_handler()
 {
 	# common
 	# keys, rename, renamenx, randomkey, sort, expireat
-	..command_table['EXISTS'] = (common.exists, 2, 2);
-	..command_table['TYPE'] = (common._type, 2, 2);
-	..command_table['EXPIRE'] = (common.expire, 3, 3);
-	..command_table['EXPIREAT'] = (common.expireat, 3, 3);
-	..command_table['PEXPIRE'] = (common.pexpire, 3, 3);
-	..command_table['PEXPIREAT'] = (common.pexpireat, 3, 3);
-	..command_table['TTL'] = (common.ttl, 2, 2);
-	..command_table['PTTL'] = (common.pttl, 2, 2);
-	..command_table['PERSIST'] = (common.persist, 2, 2);
-	..command_table['QUIT'] = (common.quit, 1, 1);
-	..command_table['PING'] = (common.ping, 1, 1);
-	..command_table['SHUTDOWN'] = (krill.shutdown, 1, 1);
-	..command_table['DUMP'] = (stream.dump, 1, 1);
+	..command_table['EXISTS'] = (common.exists, 1, 1);
+	..command_table['TYPE'] = (common._type, 1, 1);
+	..command_table['EXPIRE'] = (common.expire, 2, 2);
+	..command_table['EXPIREAT'] = (common.expireat, 2, 2);
+	..command_table['PEXPIRE'] = (common.pexpire, 2, 2);
+	..command_table['PEXPIREAT'] = (common.pexpireat, 2, 2);
+	..command_table['TTL'] = (common.ttl, 1, 1);
+	..command_table['PTTL'] = (common.pttl, 1, 1);
+	..command_table['PERSIST'] = (common.persist, 1, 1);
+	..command_table['QUIT'] = (common.quit, 0, 0);
+	..command_table['PING'] = (common.ping, 0, 0);
+	..command_table['SHUTDOWN'] = (krill.shutdown, 0, 0);
+	..command_table['DUMP'] = (stream.dump, 0, 0);
 
 	# script
-	..command_table['SCRIPT'] = (script.script, 1, -1);
-	..command_table['EVAL'] = (script._eval, 3, -1);
-	..command_table['EVALSHA'] = (script.evalsha, 3, -1);
+	..command_table['SCRIPT'] = (script.script, 0, -1);
+	..command_table['EVAL'] = (script._eval, 2, -1);
+	..command_table['EVALSHA'] = (script.evalsha, 2, -1);
 
 
 	# string
 	# decr, decrby, incr, incrby, mget, setnx, mset, msetnx
-	..command_table['SET'] = (kv.set, 3, 3);
-	..command_table['GET'] = (kv.get, 2, 2);
-	..command_table['DEL'] = (kv.del, 2, -1);
-	..command_table['GETSET'] = (kv.getset, 3, 3);
+	..command_table['SET'] = (kv.set, 2, 2);
+	..command_table['GET'] = (kv.get, 1, 1);
+	..command_table['DEL'] = (kv.del, 1, -1);
+	..command_table['GETSET'] = (kv.getset, 2, 2);
 
 	# list
 	# lrem, ltrim, rpoplpush
-	..command_table['LPUSH'] = (list.lpush, 3, -1);
-	..command_table['RPUSH'] = (list.rpush, 3, -1);
-	..command_table['LPOP'] = (list.lpop, 2, 2);
-	..command_table['RPOP'] = (list.rpop, 2, 2);
-	..command_table['BLPOP'] = (list.blpop, 3, -1);
-	..command_table['BRPOP'] = (list.brpop, 3, -1);
-	..command_table['LLEN'] = (list.llen, 2, 2);
-	..command_table['LINDEX'] = (list.lindex, 3, 3);
-	..command_table['LSET'] = (list.lset, 4, 4);
-	..command_table['LRANGE'] = (list.lrange, 4, 4);
+	..command_table['LPUSH'] = (list.lpush, 2, -1);
+	..command_table['RPUSH'] = (list.rpush, 2, -1);
+	..command_table['LPOP'] = (list.lpop, 1, 1);
+	..command_table['RPOP'] = (list.rpop, 1, 1);
+	..command_table['BLPOP'] = (list.blpop, 2, -1);
+	..command_table['BRPOP'] = (list.brpop, 2, -1);
+	..command_table['LLEN'] = (list.llen, 1, 1);
+	..command_table['LINDEX'] = (list.lindex, 2, 2);
+	..command_table['LSET'] = (list.lset, 3, 3);
+	..command_table['LRANGE'] = (list.lrange, 3, 3);
 
 	# set
 	# spop, srandmember
 	# sscan
-	..command_table['SADD'] = (set.sadd, 3, -1);
-	..command_table['SREM'] = (set.srem, 3, -1);
-	..command_table['SMEMBERS'] = (set.smembers, 2, 2);
-	..command_table['SCARD'] = (set.scard, 2, 2);
-	..command_table['SUNION'] = (set.sunion, 3, -1);
-	..command_table['SINTER'] = (set.sinter, 3, -1);
-	..command_table['SDIFF'] = (set.sdiff, 3, -1);
-	..command_table['SUNIONSTORE'] = (set.sunionstore, 4, -1);
-	..command_table['SINTERSTORE'] = (set.sinterstore, 4, -1);
-	..command_table['SDIFFSTORE'] = (set.sdiffstore, 4, -1);
-	..command_table['SISMEMBER'] = (set.sismember, 3, 3);
-	..command_table['SMOVE'] = (set.smove, 4, 4);
+	..command_table['SADD'] = (set.sadd, 2, -1);
+	..command_table['SREM'] = (set.srem, 2, -1);
+	..command_table['SMEMBERS'] = (set.smembers, 1, 1);
+	..command_table['SCARD'] = (set.scard, 1, 1);
+	..command_table['SUNION'] = (set.sunion, 2, -1);
+	..command_table['SINTER'] = (set.sinter, 2, -1);
+	..command_table['SDIFF'] = (set.sdiff, 2, -1);
+	..command_table['SUNIONSTORE'] = (set.sunionstore, 3, -1);
+	..command_table['SINTERSTORE'] = (set.sinterstore, 3, -1);
+	..command_table['SDIFFSTORE'] = (set.sdiffstore, 3, -1);
+	..command_table['SISMEMBER'] = (set.sismember, 2, 2);
+	..command_table['SMOVE'] = (set.smove, 3, 3);
 
 	# hash
 	# hmset, hmget, hincrby, hsetnx, hincrbyfloat, hscan, hstrlen
-	..command_table['HSET'] = (hash.hset, 4, 4);
-	..command_table['HDEL'] = (hash.hdel, 3, 3);
-	..command_table['HGET'] = (hash.hget, 3, 3);
-	..command_table['HLEN'] = (hash.hlen, 2, 2);
-	..command_table['HKEYS'] = (hash.hkeys, 2, 2);
-	..command_table['HVALS'] = (hash.hvals, 2, 2);
-	..command_table['HGETALL'] = (hash.hgetall, 2, 2);
-	..command_table['HEXISTS'] = (hash.hexists, 3, 3);
+	..command_table['HSET'] = (hash.hset, 3, 3);
+	..command_table['HDEL'] = (hash.hdel, 2, 2);
+	..command_table['HGET'] = (hash.hget, 2, 2);
+	..command_table['HLEN'] = (hash.hlen, 1, 1);
+	..command_table['HKEYS'] = (hash.hkeys, 1, 1);
+	..command_table['HVALS'] = (hash.hvals, 1, 1);
+	..command_table['HGETALL'] = (hash.hgetall, 1, 1);
+	..command_table['HEXISTS'] = (hash.hexists, 2, 2);
 
 	# sorted set
-	..command_table['ZADD'] = (zset.zadd, 4, -1);
-	..command_table['ZCARD'] = (zset.zcard, 2, 2);
-	..command_table['ZRANGE'] = (zset.__zrange, 4, 5);
-	..command_table['ZRANGEBYSCORE'] = (zset.__zrangebyscore, 4, 8);
-	..command_table['ZREVRANGE'] = (zset.__zrevrange, 4, 5);
-	..command_table['ZINCRBY'] = (zset.zincrby, 4, 4);
-	..command_table['ZREM'] = (zset.zrem, 3, -1);
-	..command_table['ZREMRANGEBYSCORE'] = (zset.zremrangebyscore, 4, 4);
-	..command_table['ZSCORE'] = (zset.zcard, 3, 3);
+	..command_table['ZADD'] = (zset.zadd, 3, -1);
+	..command_table['ZCARD'] = (zset.zcard, 1, 1);
+	..command_table['ZRANGE'] = (zset.__zrange, 3, 4);
+	..command_table['ZRANGEBYSCORE'] = (zset.__zrangebyscore, 3, 7);
+	..command_table['ZREVRANGE'] = (zset.__zrevrange, 3, 4);
+	..command_table['ZINCRBY'] = (zset.zincrby, 3, 3);
+	..command_table['ZREM'] = (zset.zrem, 2, -1);
+	..command_table['ZREMRANGEBYSCORE'] = (zset.zremrangebyscore, 3, 3);
+	..command_table['ZSCORE'] = (zset.zcard, 2, 2);
 	# zcount, zrand, zrevrank, zremrangebyrank, zunionstore, zinterstore
 
 	# stream
-	..command_table['XADD'] = (stream.__xadd, 5, -1);
-	..command_table['XLEN'] = (stream.xlen, 2, 2);
-	..command_table['XRANGE'] = (stream.__xrange, 4, -1);
-	..command_table['XREVRANGE'] = (stream.__xrevrange, 4, -1);
-	..command_table['XREAD'] = (stream.__xread, 4, -1);
-	..command_table['XDEL'] = (stream.xdel, 3, -1);
-	..command_table['XTRIM'] = (stream.__xtrim, 4, 5);
-	..command_table['XGROUP'] = (stream.__xgroup, 4, 5);
-	..command_table['XREADGROUP'] = (stream.__xreadgroup, 7, -1);
-	..command_table['XACK'] = (stream.xack, 4, -1);
-	..command_table['XPENDING'] = (stream.xpending, 3, 3);
-	..command_table['XCLAIM'] = (stream.xclaim, 6, -1);
-	..command_table['XINFO'] = (stream.__xinfo, 3, 4);
+	..command_table['XADD'] = (stream.__xadd, 4, -1);
+	..command_table['XLEN'] = (stream.xlen, 1, 1);
+	..command_table['XRANGE'] = (stream.__xrange, 3, -1);
+	..command_table['XREVRANGE'] = (stream.__xrevrange, 3, -1);
+	..command_table['XREAD'] = (stream.__xread, 3, -1);
+	..command_table['XDEL'] = (stream.xdel, 2, -1);
+	..command_table['XTRIM'] = (stream.__xtrim, 3, 4);
+	..command_table['XGROUP'] = (stream.__xgroup, 3, 4);
+	..command_table['XREADGROUP'] = (stream.__xreadgroup, 6, -1);
+	..command_table['XACK'] = (stream.xack, 3, -1);
+	..command_table['XPENDING'] = (stream.xpending, 2, 2);
+	..command_table['XCLAIM'] = (stream.xclaim, 5, -1);
+	..command_table['XINFO'] = (stream.__xinfo, 2, 3);
 
 	# krill tsdb extended
-	..command_table['TSADD'] = (stream.ts_db.tsadd, 2, -1);
-	..command_table['TSRANGE'] = (stream.ts_db.tsrange, 4, -1);
-	..command_table['TSSTAT'] = (stream.ts_db.tsstat, 1, 2);
+	..command_table['TSADD'] = (stream.ts_db.tsadd, 1, -1);
+	..command_table['TSRANGE'] = (stream.ts_db.tsrange, 3, -1);
+	..command_table['TSSTAT'] = (stream.ts_db.tsstat, 0, 1);
 }
 
 
